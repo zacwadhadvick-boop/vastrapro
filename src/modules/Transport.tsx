@@ -302,10 +302,10 @@ export default function Transport({ state, setState }: TransportProps) {
       ) : activeTab === 'register' ? (
         <div className="space-y-6">
           <div className="bg-white p-8 md:p-12 rounded-[2rem] border border-slate-100 shadow-sm overflow-hidden">
-            <div className="hidden print:block mb-8">
+            <div className="mb-8">
               <ReportHeader />
             </div>
-            <div className="flex items-center justify-between mb-8">
+            <div className="flex items-center justify-between mb-8 no-print">
               <div>
                 <h3 className="text-xl font-black text-slate-900 uppercase">Transport Register</h3>
                 <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mt-1">Consolidated Freight & Payment Audit</p>
