@@ -1,0 +1,17 @@
+{
+  "name": "VastraBill Enterprise",
+  "short_name": "VastraBill",
+  "description": "Enterprise Textile Billing & Inventory Management",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#2563eb",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/3145/3145827.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
