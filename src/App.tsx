@@ -151,8 +151,8 @@ const INITIAL_STATE: AppState = {
     }
   ],
   adminCredentials: {
-    username: 'admin',
-    password: 'password123'
+    username: 'netlify admin',
+    password: '12345'
   }
 };
 
