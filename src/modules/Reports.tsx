@@ -4,6 +4,7 @@ import { AppState } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, PieChart as RePieChart, Pie } from 'recharts';
 import { format } from 'date-fns';
+import ReportHeader from '../components/ReportHeader';
 
 interface ReportsProps {
   state: AppState;
@@ -365,6 +366,9 @@ export default function Reports({ state }: ReportsProps) {
                      </button>
                   </div>
                   <div className="p-12 overflow-y-auto flex-1">
+                     <div className="hidden print:block mb-10">
+                        <ReportHeader />
+                     </div>
                      {renderReportContent()}
                   </div>
                   <div className="px-12 pb-12 flex gap-4 flex-shrink-0">

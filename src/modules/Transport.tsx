@@ -1,9 +1,10 @@
 import React, { useState, Dispatch, SetStateAction } from 'react';
-import { Truck, CheckCircle2, Clock, MapPin, Truck as TruckIcon, FileText, Plus, X, Search } from 'lucide-react';
+import { Truck, CheckCircle2, Clock, MapPin, Truck as TruckIcon, FileText, Plus, X, Search, Printer } from 'lucide-react';
 import { AppState, TransportLog } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { format } from 'date-fns';
 import { cn } from '../lib/utils';
+import ReportHeader from '../components/ReportHeader';
 
 interface TransportProps {
   state: AppState;
@@ -65,6 +66,8 @@ export default function Transport({ state, setState }: TransportProps) {
       transportLogs: [newLog, ...prev.transportLogs]
     }));
     setIsModalOpen(false);
+    setSelectedLogId(newLog.id);
+    setActiveTab('voucher');
   };
 
   const handleDeleteDispatch = (id: string) => {
@@ -201,7 +204,10 @@ export default function Transport({ state, setState }: TransportProps) {
                   className="pl-10 pr-6 py-2.5 bg-slate-50 rounded-2xl text-[10px] font-black uppercase tracking-widest outline-none border border-transparent focus:border-primary/20 transition-all w-64 shadow-sm"
                 />
               </div>
-              <button className="px-5 py-2.5 bg-primary text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-primary/20 hover:scale-105 active:scale-95 transition-all">
+              <button 
+                onClick={() => {}}
+                className="px-5 py-2.5 bg-primary text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-primary/20 hover:scale-105 active:scale-95 transition-all"
+              >
                 Search
               </button>
             </div>
@@ -255,6 +261,17 @@ export default function Transport({ state, setState }: TransportProps) {
                           onClick={() => {
                             setSelectedLogId(log.id);
                             setActiveTab('voucher');
+                            setTimeout(() => window.print(), 100);
+                          }}
+                          className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-500 hover:bg-emerald-100 transition-colors"
+                          title="Print Voucher"
+                        >
+                           <Printer size={14} />
+                        </button>
+                        <button 
+                          onClick={() => {
+                            setSelectedLogId(log.id);
+                            setActiveTab('voucher');
                           }}
                           className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center text-blue-400 hover:bg-blue-100 transition-colors"
                           title="View Voucher"
@@ -284,7 +301,10 @@ export default function Transport({ state, setState }: TransportProps) {
         </div>
       ) : activeTab === 'register' ? (
         <div className="space-y-6">
-          <div className="bg-white p-8 rounded-[2rem] border border-slate-100 shadow-sm overflow-hidden">
+          <div className="bg-white p-8 md:p-12 rounded-[2rem] border border-slate-100 shadow-sm overflow-hidden">
+            <div className="hidden print:block mb-8">
+              <ReportHeader />
+            </div>
             <div className="flex items-center justify-between mb-8">
               <div>
                 <h3 className="text-xl font-black text-slate-900 uppercase">Transport Register</h3>
@@ -326,6 +346,7 @@ export default function Transport({ state, setState }: TransportProps) {
                     <th className="px-4 py-4 border border-slate-800">PMT Date</th>
                     <th className="px-4 py-4 border border-slate-800 text-right">Paid</th>
                     <th className="px-4 py-4 border border-slate-800">Open Date</th>
+                    <th className="px-4 py-4 border border-slate-800 no-print">P</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -354,6 +375,19 @@ export default function Transport({ state, setState }: TransportProps) {
                           </td>
                           <td className="px-4 py-3 border border-slate-100 font-black text-right">{log.paidAmount?.toFixed(2) || '0.00'}</td>
                           <td className="px-4 py-3 border border-slate-100 font-black">{log.openDate ? format(new Date(log.openDate), 'dd/MMM/yy') : '-'}</td>
+                          <td className="px-4 py-3 border border-slate-100 text-center no-print">
+                            <button 
+                              onClick={() => {
+                                setSelectedLogId(log.id);
+                                setActiveTab('voucher');
+                                setTimeout(() => window.print(), 100);
+                              }}
+                              className="text-emerald-500 hover:text-emerald-700 p-1"
+                              title="Print Voucher"
+                            >
+                              <Printer size={14} />
+                            </button>
+                          </td>
                         </tr>
                       ))}
                       <tr className="bg-slate-50/30 font-black italic">
@@ -361,7 +395,7 @@ export default function Transport({ state, setState }: TransportProps) {
                         <td className="px-4 py-3 border border-slate-200 text-right">{logs.reduce((sum, l) => sum + l.freightAmount, 0).toFixed(2)}</td>
                         <td colSpan={2} className="px-4 py-3 border border-slate-200"></td>
                         <td className="px-4 py-3 border border-slate-200 text-right">{logs.reduce((sum, l) => sum + (l.paidAmount || 0), 0).toFixed(2)}</td>
-                        <td className="px-4 py-3 border border-slate-200"></td>
+                        <td colSpan={2} className="px-4 py-3 border border-slate-200"></td>
                       </tr>
                     </React.Fragment>
                   ))}
@@ -371,7 +405,7 @@ export default function Transport({ state, setState }: TransportProps) {
                         <td className="px-4 py-6 border border-slate-200 text-right">{filteredLogs.reduce((sum, l) => sum + l.freightAmount, 0).toFixed(2)}</td>
                         <td colSpan={2} className="px-4 py-6 border border-slate-200"></td>
                         <td className="px-4 py-6 border border-slate-200 text-right">{filteredLogs.reduce((sum, l) => sum + (l.paidAmount || 0), 0).toFixed(2)}</td>
-                        <td className="px-4 py-6 border border-slate-200"></td>
+                        <td colSpan={2} className="px-4 py-6 border border-slate-200"></td>
                      </tr>
                   )}
                 </tbody>
@@ -380,7 +414,7 @@ export default function Transport({ state, setState }: TransportProps) {
           </div>
         </div>
       ) : (
-        <div className="bg-slate-100/50 p-10 rounded-[3rem] border border-slate-200 shadow-inner min-h-[800px]">
+        <div className="bg-slate-100/50 p-6 md:p-10 rounded-[3rem] border border-slate-200 shadow-inner min-h-[800px]">
           <div className="max-w-6xl mx-auto space-y-6">
             {!selectedLog ? (
               <div className="flex flex-col items-center justify-center py-20 text-slate-400 space-y-4">
@@ -395,7 +429,11 @@ export default function Transport({ state, setState }: TransportProps) {
               </div>
             ) : (
               <>
-                {/* Voucher Header */}
+                <div className="bg-white p-8 md:p-12 rounded-[3.5rem] shadow-2xl border border-slate-50 space-y-8 mb-6">
+                  {/* Business Header */}
+                  <ReportHeader />
+                  
+                  {/* Voucher Header */}
                 <div className="flex items-start justify-between border-b-2 border-slate-300 pb-6">
                   <div className="space-y-4">
                     <div className="bg-blue-900 text-white px-6 py-2 rounded-lg inline-block font-black text-sm tracking-widest uppercase shadow-lg">
@@ -441,7 +479,12 @@ export default function Transport({ state, setState }: TransportProps) {
                         </div>
                         <div className="flex items-center justify-between">
                           <h3 className="text-lg font-black text-slate-800 uppercase">{selectedLog.transporterName}</h3>
-                          <button className="px-4 py-2 bg-blue-50 text-blue-600 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-blue-100 transition-colors">Search Bilty</button>
+                          <button 
+                            onClick={() => alert('Searching for Bilty No: ' + selectedLog.lrNo)}
+                            className="px-4 py-2 bg-blue-50 text-blue-600 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-blue-100 transition-colors"
+                          >
+                            Search Bilty
+                          </button>
                         </div>
                         <div className="grid grid-cols-3 gap-6 pt-4 border-t border-slate-50">
                           <div className="space-y-1">
@@ -539,11 +582,17 @@ export default function Transport({ state, setState }: TransportProps) {
 
                     {/* Action Buttons */}
                     <div className="grid grid-cols-1 gap-3">
-                        <button className="w-full py-4 bg-white border border-slate-200 rounded-xl font-black uppercase tracking-widest text-[10px] shadow-sm hover:shadow-md transition-all">Re-Post</button>
+                        <button 
+                          onClick={() => alert('Posting data to ledger...')}
+                          className="w-full py-4 bg-white border border-slate-200 rounded-xl font-black uppercase tracking-widest text-[10px] shadow-sm hover:shadow-md transition-all"
+                        >
+                          Re-Post
+                        </button>
                         <button onClick={() => window.print()} className="w-full py-4 bg-slate-800 text-white rounded-xl font-black uppercase tracking-widest text-[10px] shadow-lg hover:bg-slate-900 transition-all">Save Voucher</button>
                     </div>
                   </div>
                 </div>
+              </div>
 
                 {/* History Table */}
                 <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">

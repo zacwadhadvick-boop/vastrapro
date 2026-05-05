@@ -1,9 +1,10 @@
 import React, { useState, Dispatch, SetStateAction } from 'react';
-import { ShoppingCart, Plus, Calendar, Filter, FileText, Search, X, PackageCheck, TrendingDown, Trash2, Truck as TruckIcon } from 'lucide-react';
+import { ShoppingCart, Plus, Calendar, Filter, FileText, Search, X, PackageCheck, TrendingDown, Trash2, Truck as TruckIcon, Printer } from 'lucide-react';
 import { AppState, PurchaseInvoice, Supplier } from '../types';
 import { format } from 'date-fns';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
+import ReportHeader from '../components/ReportHeader';
 
 interface PurchaseProps {
   state: AppState;
@@ -189,7 +190,10 @@ export default function Purchase({ state, setState, currentView }: PurchaseProps
                     className="pl-10 pr-6 py-2.5 bg-white border border-slate-100 rounded-2xl text-[10px] font-black uppercase tracking-widest outline-none focus:ring-8 focus:ring-primary/5 transition-all w-64 shadow-sm"
                   />
                 </div>
-                <button className="px-5 py-2.5 bg-primary text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-primary/20 hover:scale-105 active:scale-95 transition-all">
+                <button 
+                  onClick={() => {}}
+                  className="px-5 py-2.5 bg-primary text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-primary/20 hover:scale-105 active:scale-95 transition-all"
+                >
                   Search
                 </button>
               </div>
@@ -206,7 +210,23 @@ export default function Purchase({ state, setState, currentView }: PurchaseProps
       <div className="grid grid-cols-1 xl:grid-cols-4 gap-8">
          {activeTab === 'registry' ? (
            <div className="xl:col-span-3">
-             <div className="bg-white rounded-[3.5rem] shadow-sm border border-slate-50 overflow-hidden">
+             <div className="bg-white rounded-[3.5rem] shadow-sm border border-slate-50 overflow-hidden p-8 md:p-12">
+               <div className="hidden print:block mb-8">
+                 <ReportHeader />
+                 <h2 className="text-2xl font-black text-slate-900 uppercase tracking-widest text-center my-6">Inward Purchase Registry</h2>
+               </div>
+               <div className="flex items-center justify-between mb-8 no-print">
+                 <div>
+                   <h3 className="text-xl font-black text-slate-800 uppercase tracking-widest">Material Logs</h3>
+                   <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">Audit trail of all incoming goods</p>
+                 </div>
+                 <button 
+                   onClick={() => window.print()}
+                   className="px-6 py-2.5 bg-slate-800 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-900 transition-all flex items-center gap-2"
+                 >
+                   <Printer size={14} /> Print Registry
+                 </button>
+               </div>
                <div className="overflow-x-auto">
                  <table className="w-full text-left">
                    <thead>
@@ -257,6 +277,17 @@ export default function Purchase({ state, setState, currentView }: PurchaseProps
                                     onClick={() => {
                                        setSelectedBillId(p.id);
                                        setActiveTab('bill');
+                                       setTimeout(() => window.print(), 100);
+                                    }}
+                                    className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-500 hover:bg-emerald-100 transition-colors"
+                                    title="Quick Print"
+                                 >
+                                    <Printer size={14} />
+                                 </button>
+                                 <button 
+                                    onClick={() => {
+                                       setSelectedBillId(p.id);
+                                       setActiveTab('bill');
                                     }}
                                     className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center text-blue-400 hover:bg-blue-100 transition-colors"
                                     title="View Purchase Bill"
@@ -289,7 +320,12 @@ export default function Purchase({ state, setState, currentView }: PurchaseProps
                  <button onClick={() => setActiveTab('registry')} className="px-8 py-3 bg-primary text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl shadow-primary/20">Go to Registry</button>
               </div>
             ) : (
-              <div className="space-y-6">
+              <div className="space-y-6 print:p-0">
+                {/* Print Only Header */}
+                <div className="hidden print:block mb-8">
+                   <ReportHeader />
+                </div>
+
                 {/* Bill Header Section */}
                 <div className="grid grid-cols-12 gap-6">
                   <div className="col-span-3 space-y-4">
@@ -374,13 +410,21 @@ export default function Purchase({ state, setState, currentView }: PurchaseProps
                          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Bilty Date</p>
                          <p className="text-xs font-black text-slate-800">{selectedBill.biltyDate || '15/Apr/2026'}</p>
                       </div>
-                      <div className="space-y-1 text-right">
-                         <button 
-                            onClick={() => setShowTransportSlip(true)}
-                            className="px-4 py-2 bg-primary/10 text-primary rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-primary transition-all hover:text-white"
-                         >
-                            Check Transport Slip
-                         </button>
+                      <div className="space-y-1 text-right no-print">
+                         <div className="flex gap-2 justify-end">
+                            <button 
+                               onClick={() => window.print()}
+                               className="px-4 py-2 bg-slate-800 text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-slate-900 transition-all flex items-center gap-2"
+                            >
+                               <Printer size={14} /> Print Bill
+                            </button>
+                            <button 
+                               onClick={() => setShowTransportSlip(selectedBill.biltyNo)}
+                               className="px-4 py-2 bg-primary/10 text-primary rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-primary transition-all hover:text-white"
+                            >
+                               Check Transport Slip
+                            </button>
+                         </div>
                       </div>
                    </div>
                 </div>

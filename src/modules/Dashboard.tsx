@@ -162,7 +162,7 @@ export default function Dashboard({ state, setView }: DashboardProps) {
         <div className="bg-white rounded-[3rem] shadow-sm border border-slate-50 overflow-hidden">
           <div className="p-8 border-b border-slate-50 flex items-center justify-between">
             <h3 className="font-black text-lg text-slate-800 uppercase tracking-widest">Recent Sales</h3>
-            <button className="text-[10px] text-primary font-black uppercase tracking-widest hover:underline">View Journal</button>
+            <button onClick={() => setView('sales:history')} className="text-[10px] text-primary font-black uppercase tracking-widest hover:underline">View Journal</button>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-left">
@@ -195,7 +195,7 @@ export default function Dashboard({ state, setView }: DashboardProps) {
         <div className="bg-white rounded-[3rem] shadow-sm border border-slate-50 overflow-hidden">
           <div className="p-8 border-b border-slate-50 flex items-center justify-between">
             <h3 className="font-black text-lg text-slate-800 uppercase tracking-widest font-serif">Shortage Alert</h3>
-            <button className="text-[10px] text-primary font-black uppercase tracking-widest hover:underline">Restock Master</button>
+            <button onClick={() => setView('purchase')} className="text-[10px] text-primary font-black uppercase tracking-widest hover:underline">Restock Master</button>
           </div>
           <div className="p-8 space-y-4">
             {lowStockItems.length === 0 ? (

@@ -400,11 +400,17 @@ export default function Inventory({ state, setState }: InventoryProps) {
                 type="text" 
                 list="inventory-suggestions"
                 placeholder="Search..." 
-                className="w-full pl-12 pr-4 py-3.5 bg-white border border-slate-100 rounded-[1.25rem] text-[10px] font-black uppercase tracking-widest focus:ring-[8px] focus:ring-primary/5 outline-none transition-all shadow-sm"
+                className="w-full pl-12 pr-4 py-3.5 bg-white border border-slate-100 rounded-l-[1.25rem] text-[10px] font-black uppercase tracking-widest focus:ring-[8px] focus:ring-primary/5 outline-none transition-all shadow-sm"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
+            <button 
+              onClick={() => {}}
+              className="px-6 py-3.5 bg-slate-800 text-white rounded-r-[1.25rem] text-[10px] font-black uppercase tracking-widest hover:bg-slate-900 transition-all border-l border-slate-700"
+            >
+              Search
+            </button>
           </div>
           <button 
             onClick={handleOpenAdd}

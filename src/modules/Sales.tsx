@@ -4,6 +4,7 @@ import { AppState, Product, Invoice, ProductVariant } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { format } from 'date-fns';
 import { cn } from '../lib/utils';
+import ReportHeader from '../components/ReportHeader';
 
 interface CartItem {
   product: Product;
@@ -162,6 +163,7 @@ export default function Sales({ state, setState, currentView }: SalesProps) {
     setSelectedCustomer('');
     setSelectedBroker('');
     setActiveTab('invoices');
+    setPreviewInvoice(newInvoice);
   };
 
   const handleProcessReturn = (invoice: Invoice) => {
@@ -254,7 +256,7 @@ export default function Sales({ state, setState, currentView }: SalesProps) {
   const shareOnWhatsApp = (inv: Invoice) => {
     const customer = state.customers.find(c => c.id === inv.customerId);
     const phone = customer?.phone || '';
-    const message = `Hello ${customer?.name || 'Customer'},\n\nYour invoice *${inv.invoiceNo}* from *Ankita Traders* is ready.\nTotal Amount: *₹${inv.totalAmount}*\n\nThank you for shopping with us!`;
+    const message = `Hello ${customer?.name || 'Customer'},\n\nYour invoice *${inv.invoiceNo}* from *Ankit Enterprises* is ready.\nTotal Amount: *₹${inv.totalAmount}*\n\nThank you for shopping with us!`;
     const url = `https://wa.me/${phone.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`;
     window.open(url, '_blank');
   };
@@ -340,7 +342,10 @@ export default function Sales({ state, setState, currentView }: SalesProps) {
                     {filteredProducts.length} ARTICLES
                   </div>
                 </div>
-                <button className="px-8 py-4 md:px-10 md:py-6 bg-primary text-white rounded-[1.5rem] md:rounded-[2.5rem] font-black uppercase tracking-[0.2em] text-[10px] md:text-xs shadow-xl shadow-primary/30 hover:scale-105 active:scale-95 transition-all">
+                <button 
+                  onClick={() => {}}
+                  className="px-8 py-4 md:px-10 md:py-6 bg-primary text-white rounded-[1.5rem] md:rounded-[2.5rem] font-black uppercase tracking-[0.2em] text-[10px] md:text-xs shadow-xl shadow-primary/30 hover:scale-105 active:scale-95 transition-all"
+                >
                   Search
                 </button>
              </div>
@@ -725,13 +730,26 @@ export default function Sales({ state, setState, currentView }: SalesProps) {
                       </td>
                       <td className="px-8 py-6 flex items-center gap-2">
                         <button 
+                          onClick={() => {
+                            setPreviewInvoice(inv);
+                            setTimeout(() => window.print(), 100);
+                          }}
+                          className="w-10 h-10 flex items-center justify-center text-emerald-500 hover:text-emerald-700 transition-all rounded-full hover:bg-emerald-50"
+                          title="Direct Print"
+                        >
+                           <Printer size={18} />
+                        </button>
+                        <button 
                           onClick={() => handleOpenPreview(inv)}
                           className="w-10 h-10 flex items-center justify-center text-slate-400 hover:text-primary transition-all rounded-full hover:bg-primary/5"
                           title="Preview Bill"
                         >
                            <Calculator size={20} />
                         </button>
-                        <button className="w-10 h-10 flex items-center justify-center text-slate-400 hover:text-primary transition-all rounded-full hover:bg-primary/5">
+                        <button 
+                          onClick={() => handleOpenPreview(inv)}
+                          className="w-10 h-10 flex items-center justify-center text-slate-400 hover:text-primary transition-all rounded-full hover:bg-primary/5"
+                        >
                            <ChevronRight size={20} />
                         </button>
                       </td>
@@ -1008,18 +1026,20 @@ export default function Sales({ state, setState, currentView }: SalesProps) {
                       {/* Indian Style Invoice Header */}
                     <div className="text-center mb-0 relative pb-2">
                          <div className="absolute left-0 top-0 text-left">
-                            <div className="font-serif italic font-black text-lg leading-none">Ankita <span className="block text-[8px] tracking-widest not-italic">Traders</span></div>
+                            <div className="font-serif italic font-black text-lg leading-none">Ankit <span className="block text-[8px] tracking-widest not-italic">Enterprises</span></div>
                             <div className="border border-black px-1 mt-1 font-black text-[9px] inline-block">TAX-INVOICE</div>
                          </div>
 
-                         <div className="text-[10px] font-black text-rose-600 mb-1">|| श्री गणेशाय नमः ||</div>
-                         <h1 className="text-4xl font-black uppercase tracking-tight mb-0">ANKITA TRADERS</h1>
-                         <p className="font-bold text-[9px]">145, Gauri Market, Dupatta Gali, Roshan Bagh, PRAYAGRAJ-211003</p>
+                         <div className="text-[10px] font-black text-rose-600 mb-1 flex items-center justify-center gap-4">
+                            <span>|| श्री गणेशाय नमः ||</span>
+                         </div>
+                         <h1 className="text-4xl font-black uppercase tracking-tight mb-0">ANKIT ENTERPRISES</h1>
+                         <p className="font-bold text-[9px]">123, Textile Market, Ring Road, Surat - 395002 (Gujarat)</p>
                          
                          <div className="grid grid-cols-3 border-y border-black mt-2 text-[8px] font-bold py-0.5">
-                            <div className="text-left px-1 border-r border-black">GST NO. <span className="font-black text-[9px]">09CQFPR3593C1ZK</span></div>
-                            <div className="text-center px-1 border-r border-black uppercase">Contact No : 7007062794, 7007508004</div>
-                            <div className="text-right px-1">PAN NO. <span className="font-black">CQFPR3593C</span></div>
+                            <div className="text-left px-1 border-r border-black">GST NO. <span className="font-black text-[9px]">24ANKIT1234E1Z5</span></div>
+                            <div className="text-center px-1 border-r border-black uppercase">Contact No : +91 99887 76655</div>
+                            <div className="text-right px-1">PAN NO. <span className="font-black">ANKIT1234E</span></div>
                          </div>
                          <div className="grid grid-cols-4 border-b border-black text-[8px] font-bold py-0.5">
                             <div className="text-left px-1 border-r border-black">BILL NO : <span className="text-[9px] font-black">{previewInvoice.invoiceNo.split('/').pop()}</span></div>
@@ -1224,7 +1244,7 @@ export default function Sales({ state, setState, currentView }: SalesProps) {
                          <div className="p-1 text-right flex flex-col justify-between">
                             <div className="flex justify-between">
                                <span className="font-black text-rose-600">FOR</span>
-                               <span className="font-black text-blue-900">ANKITA TRADERS</span>
+                               <span className="font-black text-blue-900 uppercase">ANKIT ENTERPRISES</span>
                             </div>
                             <div className="text-blue-800 italic font-bold">Nityanand Kumar Rai</div>
                             <div className="font-black text-[7px] uppercase">Authorised Signatory</div>
