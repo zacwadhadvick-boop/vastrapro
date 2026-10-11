@@ -11,7 +11,13 @@ interface BrokerMasterProps {
 export default function BrokerMaster({ state, setState }: BrokerMasterProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [newBroker, setNewBroker] = useState({ name: '', commissionRate: 2 });
+  const [newBroker, setNewBroker] = useState({ 
+    name: '', 
+    commissionRate: 2,
+    address: '',
+    mobile: '',
+    bankAccountNo: ''
+  });
 
   const handleAddBroker = (e: React.FormEvent) => {
     e.preventDefault();
@@ -21,11 +27,14 @@ export default function BrokerMaster({ state, setState }: BrokerMasterProps) {
         brokers: [...prev.brokers, { 
           id: `brk-${Date.now()}`, 
           name: newBroker.name, 
-          commissionRate: newBroker.commissionRate 
+          commissionRate: newBroker.commissionRate,
+          address: newBroker.address,
+          phone: newBroker.mobile,
+          bankAccountNo: newBroker.bankAccountNo
         }]
       }));
       setIsModalOpen(false);
-      setNewBroker({ name: '', commissionRate: 2 });
+      setNewBroker({ name: '', commissionRate: 2, address: '', mobile: '', bankAccountNo: '' });
     }
   };
 
@@ -98,6 +107,10 @@ export default function BrokerMaster({ state, setState }: BrokerMasterProps) {
                   <div>
                     <h4 className="font-black text-slate-800 text-lg tracking-tight truncate max-w-[150px]">{b.name}</h4>
                     <span className="text-[9px] bg-primary/5 text-primary px-3 py-1 rounded-lg font-black uppercase tracking-widest mt-2 inline-block">Commission: {b.commissionRate}%</span>
+                    <div className="mt-4 space-y-1">
+                      {b.phone && <p className="text-[10px] text-slate-400 font-bold">M: {b.phone}</p>}
+                      {b.bankAccountNo && <p className="text-[10px] text-slate-400 font-bold">A/C: {b.bankAccountNo}</p>}
+                    </div>
                   </div>
                 </div>
                 <div className="text-right">
@@ -152,6 +165,33 @@ export default function BrokerMaster({ state, setState }: BrokerMasterProps) {
                     className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all font-bold text-slate-700" 
                     value={newBroker.commissionRate}
                     onChange={(e) => setNewBroker({...newBroker, commissionRate: Number(e.target.value)})}
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2 block">Mobile Number</label>
+                  <input 
+                    placeholder="Enter mobile"
+                    className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all font-bold text-slate-700" 
+                    value={newBroker.mobile}
+                    onChange={(e) => setNewBroker({...newBroker, mobile: e.target.value})}
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2 block">Bank Account No.</label>
+                  <input 
+                    placeholder="Enter account number"
+                    className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all font-bold text-slate-700" 
+                    value={newBroker.bankAccountNo}
+                    onChange={(e) => setNewBroker({...newBroker, bankAccountNo: e.target.value})}
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2 block">Address</label>
+                  <textarea 
+                    placeholder="Enter office address"
+                    className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all font-bold text-slate-700 h-24 resize-none" 
+                    value={newBroker.address}
+                    onChange={(e) => setNewBroker({...newBroker, address: e.target.value})}
                   />
                 </div>
               </div>

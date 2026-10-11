@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { FileBarChart, PieChart, TrendingUp, Download, Eye, Table as TableIcon, X, BarChart as BarChartIcon } from 'lucide-react';
+import { FileBarChart, PieChart, TrendingUp, Download, Eye, Table as TableIcon, X, BarChart as BarChartIcon, Search } from 'lucide-react';
 import { AppState } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, PieChart as RePieChart, Pie } from 'recharts';
@@ -8,12 +8,14 @@ import ReportHeader from '../components/ReportHeader';
 
 interface ReportsProps {
   state: AppState;
+  setView: (v: any) => void;
 }
 
 const COLORS = ['#1E3A8A', '#10B981', '#FF6B35', '#8B5CF6', '#EC4899', '#F59E0B'];
 
-export default function Reports({ state }: ReportsProps) {
+export default function Reports({ state, setView }: ReportsProps) {
   const [selectedReport, setSelectedReport] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
 
   const totalInStock = state.products.reduce((acc, p) => acc + p.variants.reduce((s, v) => s + v.qty, 0), 0);
   const totalSales = state.invoices.reduce((acc, inv) => acc + inv.totalAmount, 0);
@@ -51,7 +53,10 @@ export default function Reports({ state }: ReportsProps) {
       desc: 'Current financial standing of the business.',
       stats: 'Balanced / Audited'
     },
-  ];
+  ].filter(r => 
+    r.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    r.desc.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   const renderReportContent = () => {
     switch (selectedReport) {
@@ -77,18 +82,26 @@ export default function Reports({ state }: ReportsProps) {
               <thead className="bg-slate-50 uppercase font-black text-slate-400">
                 <tr>
                   <th className="p-4">Item Name</th>
+                  <th className="p-4">HSN</th>
                   <th className="p-4 text-center">Variants</th>
                   <th className="p-4 text-right">Total Stock</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {stockData.map(d => (
-                  <tr key={d.name} className="hover:bg-slate-50">
-                    <td className="p-4 font-black">{d.name}</td>
-                    <td className="p-4 text-center">{state.products.find(p => p.name === d.name)?.variants.length}</td>
-                    <td className="p-4 text-right font-black text-primary">{d.stock}</td>
-                  </tr>
-                ))}
+                {stockData.map(d => {
+                  const product = state.products.find(p => p.name === d.name);
+                  return (
+                    <tr key={d.name} className="hover:bg-slate-50">
+                      <td className="p-4 font-black">
+                        <span className="text-slate-400 font-bold mr-2 text-[10px]">[{product?.brand}]</span>
+                        {d.name}
+                      </td>
+                      <td className="p-4 font-bold text-slate-500">{product?.hsnCode || '-'}</td>
+                      <td className="p-4 text-center">{product?.variants.length}</td>
+                      <td className="p-4 text-right font-black text-primary">{d.stock}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -269,6 +282,24 @@ export default function Reports({ state }: ReportsProps) {
 
   return (
     <div className="space-y-12">
+       {/* Search & Intelligence */}
+       <div className="flex flex-col md:flex-row items-center justify-between gap-6 pb-2 border-b border-slate-100">
+          <div>
+            <h3 className="font-serif text-3xl font-black text-slate-900 tracking-tight">Business Intelligence</h3>
+            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.2em] mt-1 italic">Real-time analytical data engine</p>
+          </div>
+          <div className="relative group w-full md:w-96">
+            <Search size={20} className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-primary transition-all" />
+            <input 
+              type="text" 
+              placeholder="Search reports by identity..." 
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-16 pr-8 py-5 bg-white border border-slate-100 rounded-[2rem] outline-none font-black text-xs uppercase tracking-widest focus:ring-[12px] focus:ring-primary/5 transition-all shadow-xl shadow-slate-200/20 placeholder:text-slate-200"
+            />
+          </div>
+       </div>
+
        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
          {reportList.map((r, i) => (
            <motion.div 

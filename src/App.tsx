@@ -14,6 +14,11 @@ import CustomerMaster from './modules/CustomerMaster';
 import BrokerMaster from './modules/BrokerMaster';
 import WarehouseMaster from './modules/WarehouseMaster';
 import Reports from './modules/Reports';
+import BillAdjustment from './modules/BillAdjustment';
+import Taxation from './modules/Taxation';
+import AccountReports from './modules/AccountReports';
+import PurchaseReports from './modules/PurchaseReports';
+import BusinessProfileSettings from './modules/BusinessProfileSettings';
 import { User, AppState, View } from './types';
 
 const INITIAL_STATE: AppState = {
@@ -33,8 +38,8 @@ const INITIAL_STATE: AppState = {
       batchNo: 'B24-001',
       barcode: '8901234567890',
       variants: [
-        { id: 'v1', size: 'Free Size', color: 'Royal Red', colorCode: '#C41E3A', qty: 25, warehouseId: 'w1' },
-        { id: 'v2', size: 'Free Size', color: 'Temple Gold', colorCode: '#FFD700', qty: 15, warehouseId: 'w1' }
+        { id: 'v1', size: 'Free Size', color: 'Royal Red', hsnCode: '5208', qty: 25, warehouseId: 'w1' },
+        { id: 'v2', size: 'Free Size', color: 'Temple Gold', hsnCode: '5208', qty: 15, warehouseId: 'w1' }
       ]
     },
     {
@@ -52,8 +57,8 @@ const INITIAL_STATE: AppState = {
       batchNo: 'L24-052',
       barcode: '8901234567891',
       variants: [
-        { id: 'v3', size: 'XL', color: 'Midnight Blue', colorCode: '#191970', qty: 10, warehouseId: 'w1' },
-        { id: 'v4', size: 'L', color: 'Emerald Green', colorCode: '#50C878', qty: 8, warehouseId: 'w2' }
+        { id: 'v3', size: 'XL', color: 'Midnight Blue', hsnCode: '5208', qty: 10, warehouseId: 'w1' },
+        { id: 'v4', size: 'L', color: 'Emerald Green', hsnCode: '5208', qty: 8, warehouseId: 'w2' }
       ]
     },
     {
@@ -71,8 +76,8 @@ const INITIAL_STATE: AppState = {
       batchNo: 'K24-102',
       barcode: '8901234567892',
       variants: [
-        { id: 'v5', size: 'M', color: 'Pastel Pink', colorCode: '#F8C8DC', qty: 40, warehouseId: 'w1' },
-        { id: 'v6', size: 'XL', color: 'Sky Blue', colorCode: '#87CEEB', qty: 35, warehouseId: 'w2' }
+        { id: 'v5', size: 'M', color: 'Pastel Pink', hsnCode: '5208', qty: 40, warehouseId: 'w1' },
+        { id: 'v6', size: 'XL', color: 'Sky Blue', hsnCode: '5208', qty: 35, warehouseId: 'w2' }
       ]
     }
   ],
@@ -117,11 +122,37 @@ const INITIAL_STATE: AppState = {
       customerId: 'c1',
       date: new Date().toISOString(),
       items: [
-        { productId: 'p1', size: 'Free Size', color: 'Royal Red', qty: 10, price: 4500, discount: 0 }
+        {
+          productId: 'p1',
+          productName: 'Designer Silk Saree',
+          category: 'Saree',
+          brand: 'Heritage Silk',
+          pcs: 10,
+          mtr: 0,
+          rate: 4500,
+          amount: 45000,
+          discPerc: 0,
+          discAmt: 0,
+          netAmount: 45000,
+          variantId: 'v1'
+        }
       ],
       brokerId: 'b1',
-      taxRate: 12,
       totalAmount: 50400,
+      summary: {
+        totalPcs: 10,
+        totalMtr: 0,
+        grossValue: 45000,
+        itemDisc: 0,
+        brandDisc: 0,
+        taxableAmt: 45000,
+        cgst: 2700,
+        sgst: 2700,
+        igst: 0,
+        totalGst: 5400,
+        roundOff: 0,
+        netAmount: 50400
+      },
       status: 'paid'
     }
   ],
@@ -150,6 +181,22 @@ const INITIAL_STATE: AppState = {
       freightAmount: 1800
     }
   ],
+  billAdjustments: [],
+  businessProfile: {
+    name: 'ANKIT ENTERPRISES',
+    address: 'WARD NO. 6, IMAMGANJ, PRAYAGRAJ',
+    city: 'PRAYAGRAJ',
+    state: '09-UTTAR PRADESH',
+    pincode: '229413',
+    gstin: '09AVOPR1645M1ZT',
+    phone: '9839132686',
+    email: 'contact@ankitenterprises.com',
+    website: 'www.ankitenterprises.com',
+    socialLinks: {
+      facebook: 'https://facebook.com/ankitenterprises',
+      instagram: 'https://instagram.com/ankitenterprises'
+    }
+  },
   adminCredentials: {
     username: 'netlify admin',
     password: '12345'
@@ -238,27 +285,34 @@ export default function App() {
               className="h-full"
             >
               {view === 'dashboard' && <Dashboard state={state} setView={setView} />}
-              {view === 'inventory' && <Inventory state={state} setState={setState} />}
+              {view === 'inventory' && <Inventory state={state} setState={setState} setView={setView} />}
               {view.startsWith('purchase') && (
                 <>
                   {view === 'purchase:suppliers' ? (
                     <SupplierMaster state={state} setState={setState} />
                   ) : (
-                    <Purchase state={state} setState={setState} currentView={view} />
+                    <Purchase state={state} setState={setState} currentView={view} setView={setView} />
                   )}
                 </>
               )}
-              {view.startsWith('sales') && <Sales state={state} setState={setState} currentView={view} />}
-              {view === 'customers' && <CustomerMaster state={state} setState={setState} />}
+              {view.startsWith('sales') && <Sales state={state} setState={setState} currentView={view} setView={setView} />}
+              {view === 'customers' && <CustomerMaster state={state} setState={setState} setView={setView} />}
               {view === 'brokers' && <BrokerMaster state={state} setState={setState} />}
-              {view === 'warehouse' && <WarehouseMaster state={state} setState={setState} />}
-              {view === 'accounting' && <Accounting state={state} setState={setState} />}
-              {view === 'transport' && <Transport state={state} setState={setState} />}
-              {view === 'reports' && <Reports state={state} />}
+              {view === 'warehouse' && <WarehouseMaster state={state} setState={setState} setView={setView} />}
+              {view === 'accounting' && <Accounting state={state} setState={setState} setView={setView} />}
+              {view === 'transport' && <Transport state={state} setState={setState} setView={setView} />}
+              {view === 'adjustment' && <BillAdjustment state={state} setState={setState} />}
+              {view === 'taxation' && <Taxation state={state} setView={setView} />}
+              {view === 'accountReports' && <AccountReports state={state} setView={setView} />}
+              {view === 'purchaseReports' && <PurchaseReports state={state} setView={setView} />}
+              {view === 'reports' && <Reports state={state} setView={setView} />}
               {view === 'settings' && (
-                <div className="bg-white p-8 md:p-12 rounded-[3.5rem] border border-slate-100 shadow-sm space-y-12">
-                  <div>
-                    <h3 className="font-serif text-3xl font-bold text-slate-800">System Configuration</h3>
+                <div className="space-y-12">
+                  <BusinessProfileSettings state={state} setState={setState} />
+                  
+                  <div className="bg-white p-8 md:p-12 rounded-[3.5rem] border border-slate-100 shadow-sm space-y-12">
+                    <div>
+                      <h3 className="font-serif text-3xl font-bold text-slate-800">System Configuration</h3>
                     <p className="text-sm text-slate-400 mt-2 font-medium">Enterprise offline-first ERP mode active.</p>
                   </div>
                   
@@ -333,6 +387,7 @@ export default function App() {
                        </motion.div>
                     </div>
                   )}
+                  </div>
                 </div>
               )}
             </motion.div>

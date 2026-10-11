@@ -1,15 +1,16 @@
 import React, { useState, Dispatch, SetStateAction } from 'react';
 import { Users, Plus, MapPin, Search, X, Globe, Phone, CreditCard, ShieldCheck } from 'lucide-react';
-import { AppState, Customer, Area } from '../types';
+import { AppState, Customer, Area, View } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 
 interface CustomerMasterProps {
   state: AppState;
   setState: Dispatch<SetStateAction<AppState>>;
+  setView?: (view: View) => void;
 }
 
-export default function CustomerMaster({ state, setState }: CustomerMasterProps) {
+export default function CustomerMaster({ state, setState, setView }: CustomerMasterProps) {
   const [isAreaModal, setIsAreaModal] = useState(false);
   const [isCustomerModal, setIsCustomerModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -107,6 +108,29 @@ export default function CustomerMaster({ state, setState }: CustomerMasterProps)
                         <Globe size={14} className="text-primary/40" />
                         <span className="text-[10px] font-bold uppercase tracking-tighter">{state.areas.find(a => a.id === c.areaId)?.areaName || 'No Area'}</span>
                      </div>
+                  </div>
+                  
+                  <div className="mt-8 flex flex-col gap-2 relative z-10">
+                    <div className="flex gap-2">
+                      <button 
+                         onClick={() => {
+                           setSearchTerm(c.name);
+                           setView('sales');
+                         }}
+                         className="flex-1 py-3 bg-primary text-white rounded-2xl text-[9px] font-black uppercase tracking-widest shadow-xl shadow-primary/20 hover:scale-105 active:scale-95 transition-all"
+                      >
+                         Billing Desk
+                      </button>
+                      <button 
+                         onClick={() => {
+                           setSearchTerm(c.name);
+                           setView('accounting');
+                         }}
+                         className="flex-1 py-3 bg-slate-50 text-slate-500 rounded-2xl text-[9px] font-black uppercase tracking-widest border border-slate-100 hover:bg-slate-800 hover:text-white transition-all shadow-sm active:scale-95"
+                      >
+                         Ledger Flow
+                      </button>
+                    </div>
                   </div>
                   
                   <div className="absolute -bottom-4 -right-4 text-emerald-500/5 group-hover:scale-110 transition-transform duration-700">

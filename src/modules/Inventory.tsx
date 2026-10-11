@@ -7,22 +7,31 @@ import { cn } from '../lib/utils';
 interface InventoryProps {
   state: AppState;
   setState: Dispatch<SetStateAction<AppState>>;
+  setView: (v: any) => void;
 }
 
-export default function Inventory({ state, setState }: InventoryProps) {
+export default function Inventory({ state, setState, setView }: InventoryProps) {
   const [activeTab, setActiveTab] = useState<'master' | 'matrix' | 'pricing' | 'warehouse'>('master');
   const [searchTerm, setSearchTerm] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('all');
+  const [warehouseFilter, setWarehouseFilter] = useState('all');
+  const [showFilters, setShowFilters] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   
   // Local state for variants during addition/editing
   const [localVariants, setLocalVariants] = useState<ProductVariant[]>([]);
 
-  const filteredProducts = state.products.filter(p => 
-    p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    p.brand.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    p.barcode.includes(searchTerm)
-  );
+  const filteredProducts = state.products.filter(p => {
+    const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                         p.brand.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         p.barcode.includes(searchTerm);
+    
+    const matchesCategory = categoryFilter === 'all' || p.category === categoryFilter;
+    const matchesWarehouse = warehouseFilter === 'all' || p.variants.some(v => v.warehouseId === warehouseFilter);
+
+    return matchesSearch && matchesCategory && matchesWarehouse;
+  });
 
   const suggestions = Array.from(new Set([
     ...state.products.map(p => p.name),
@@ -46,7 +55,7 @@ export default function Inventory({ state, setState }: InventoryProps) {
       id: Math.random().toString(36).substr(2, 9),
       size: 'M',
       color: 'Standard',
-      colorCode: '#000000',
+      hsnCode: '',
       qty: 0,
       warehouseId: state.warehouses[0]?.id || 'w1'
     }]);
@@ -75,7 +84,7 @@ export default function Inventory({ state, setState }: InventoryProps) {
         id: Math.random().toString(36).substr(2, 9),
         size: '',
         color: '',
-        colorCode: '#000000',
+        hsnCode: '',
         qty: 0,
         warehouseId: state.warehouses[0]?.id || 'w1'
       }
@@ -108,6 +117,7 @@ export default function Inventory({ state, setState }: InventoryProps) {
       discountMax: Number(formData.get('discountMax')),
       batchNo: formData.get('batchNo') as string,
       barcode: formData.get('barcode') as string || (editingProduct?.barcode || Math.random().toString().slice(2, 12)),
+      hsnCode: formData.get('hsnCode') as string,
       variants: localVariants
     };
 
@@ -167,15 +177,15 @@ export default function Inventory({ state, setState }: InventoryProps) {
                       <tr key={p.id} className="hover:bg-slate-50 transition-colors">
                         <td className="px-8 py-6">
                            <p className="text-sm font-black text-slate-800">{p.name}</p>
-                           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{p.brand} | {p.barcode}</p>
+                           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{p.brand} | {p.barcode} {p.hsnCode && `| HSN: ${p.hsnCode}`}</p>
                         </td>
                         <td className="px-8 py-6">
                           <span className="px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-[9px] font-black uppercase tracking-widest border border-blue-100">{p.category}</span>
                         </td>
                         <td className="px-8 py-6">
-                           <div className="flex justify-center gap-1">
+                           <div className="flex justify-center gap-1 flex-wrap max-w-[100px]">
                              {p.variants.map((v, i) => (
-                               <div key={i} className="w-4 h-4 rounded-full border border-white shadow-sm" style={{ backgroundColor: v.colorCode }} title={`${v.size} - ${v.color}`} />
+                               <span key={i} className="px-1.5 py-0.5 bg-slate-100 text-[8px] font-black rounded border border-slate-200">{v.size}</span>
                              ))}
                            </div>
                         </td>
@@ -266,10 +276,9 @@ export default function Inventory({ state, setState }: InventoryProps) {
                    {w.items.map((item, idx) => (
                      <div key={idx} className="flex items-center justify-between p-4 bg-white border border-slate-50 rounded-2xl">
                         <div className="flex items-center gap-3">
-                           <div className="w-8 h-8 rounded-full border border-slate-100" style={{ backgroundColor: item.colorCode }} />
                            <div>
                               <p className="text-[10px] font-black text-slate-800 uppercase">{item.productName}</p>
-                              <p className="text-[9px] text-slate-400 font-bold uppercase">{item.size} | {item.color}</p>
+                              <p className="text-[9px] text-slate-400 font-bold uppercase">{item.size} | {item.color} {item.hsnCode && `| HSN ${item.hsnCode}`}</p>
                            </div>
                         </div>
                         <p className="font-black text-slate-800 text-sm">{item.qty}</p>
@@ -335,9 +344,10 @@ export default function Inventory({ state, setState }: InventoryProps) {
                 {/* Variants Preview */}
                 <div className="flex flex-wrap gap-2 mb-8">
                   {product.variants.slice(0, 4).map((v, i) => (
-                    <div key={i} className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-100 rounded-xl shadow-sm">
-                       <div className="w-2 h-2 rounded-full" style={{ backgroundColor: v.colorCode }} />
-                       <span className="text-[8px] font-black uppercase text-slate-500">{v.size}</span>
+                    <div key={i} className="flex flex-col px-3 py-1.5 bg-white border border-slate-100 rounded-xl shadow-sm">
+                       <span className="text-[8px] font-black uppercase text-slate-300">Size: {v.size}</span>
+                       <span className="text-[8px] font-black uppercase text-slate-500">{v.color}</span>
+                       {v.hsnCode && <span className="text-[7px] font-bold text-primary">HSN: {v.hsnCode}</span>}
                     </div>
                   ))}
                   {product.variants.length > 4 && (
@@ -348,19 +358,53 @@ export default function Inventory({ state, setState }: InventoryProps) {
                 </div>
 
                 {/* Global Actions */}
-                <div className="flex items-center p-1 bg-slate-50 rounded-2xl border border-slate-100">
-                   <button 
-                     onClick={() => handleEdit(product)}
-                     className="flex-1 flex items-center justify-center gap-2 py-3 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 hover:text-primary transition-colors bg-white rounded-xl shadow-sm border border-slate-100 group/btn"
-                   >
-                     <Edit size={14} className="group-hover/btn:scale-110 transition-transform" /> Edit Master
-                   </button>
-                   <button 
-                     onClick={() => handleDelete(product.id)}
-                     className="w-14 flex items-center justify-center text-slate-300 hover:text-red-500 transition-colors"
-                   >
-                      <Trash2 size={16} />
-                   </button>
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center p-1 bg-slate-50 rounded-2xl border border-slate-100">
+                     <button 
+                       onClick={() => handleEdit(product)}
+                       className="flex-1 flex items-center justify-center gap-2 py-3 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 hover:text-primary transition-colors bg-white rounded-xl shadow-sm border border-slate-100 group/btn"
+                     >
+                       <Edit size={14} className="group-hover/btn:scale-110 transition-transform" /> Edit Master
+                     </button>
+                     <button 
+                       onClick={() => handleDelete(product.id)}
+                       className="w-14 flex items-center justify-center text-slate-300 hover:text-red-500 transition-colors"
+                     >
+                        <Trash2 size={16} />
+                     </button>
+                  </div>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2 font-black uppercase tracking-widest text-[9px]">
+                    <button 
+                      onClick={() => {
+                        setSearchTerm(product.name);
+                        setView('sales');
+                      }}
+                      className="py-2.5 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-600 hover:text-white transition-all text-center border border-blue-100"
+                    >
+                      Sales
+                    </button>
+                    <button 
+                      onClick={() => {
+                        setSearchTerm(product.name);
+                        setView('purchase');
+                      }}
+                      className="py-2.5 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-600 hover:text-white transition-all text-center border border-emerald-100"
+                    >
+                      Purchase
+                    </button>
+                    <button 
+                      onClick={() => handleEdit(product)}
+                      className="py-2.5 bg-amber-50 text-amber-600 rounded-xl hover:bg-amber-600 hover:text-white transition-all text-center border border-amber-100"
+                    >
+                      Modify
+                    </button>
+                    <button 
+                      onClick={() => handleDelete(product.id)}
+                      className="py-2.5 bg-rose-50 text-rose-600 rounded-xl hover:bg-rose-600 hover:text-white transition-all text-center border border-rose-100"
+                    >
+                      Remove
+                    </button>
+                  </div>
                 </div>
               </motion.div>
             ))}
@@ -399,17 +443,20 @@ export default function Inventory({ state, setState }: InventoryProps) {
               <input 
                 type="text" 
                 list="inventory-suggestions"
-                placeholder="Search..." 
-                className="w-full pl-12 pr-4 py-3.5 bg-white border border-slate-100 rounded-l-[1.25rem] text-[10px] font-black uppercase tracking-widest focus:ring-[8px] focus:ring-primary/5 outline-none transition-all shadow-sm"
+                placeholder="Find product..." 
+                className="w-full pl-12 pr-4 py-3.5 bg-white border border-slate-100 rounded-2xl text-[10px] font-black uppercase tracking-widest focus:ring-[8px] focus:ring-primary/5 outline-none transition-all shadow-sm"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
             <button 
-              onClick={() => {}}
-              className="px-6 py-3.5 bg-slate-800 text-white rounded-r-[1.25rem] text-[10px] font-black uppercase tracking-widest hover:bg-slate-900 transition-all border-l border-slate-700"
+              onClick={() => setShowFilters(!showFilters)}
+              className={cn(
+                "px-6 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2",
+                showFilters ? "bg-slate-800 text-white" : "bg-white text-slate-600 border border-slate-100"
+              )}
             >
-              Search
+              <Filter size={16} /> {showFilters ? 'Hide' : 'Filter'}
             </button>
           </div>
           <button 
@@ -420,6 +467,58 @@ export default function Inventory({ state, setState }: InventoryProps) {
           </button>
         </div>
       </div>
+
+      <AnimatePresence>
+        {showFilters && (
+          <motion.div 
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="overflow-hidden no-print"
+          >
+            <div className="bg-white border border-slate-100 rounded-[2rem] p-8 grid grid-cols-1 md:grid-cols-3 gap-6 shadow-sm mb-4">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                  <Palette size={12} /> Category
+                </label>
+                <select 
+                  value={categoryFilter}
+                  onChange={(e) => setCategoryFilter(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-[11px] font-bold outline-none focus:ring-4 focus:ring-primary/5 appearance-none"
+                >
+                  <option value="all">All Categories</option>
+                  {Array.from(new Set(state.products.map(p => p.category))).map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                   <Package size={12} /> Warehouse
+                </label>
+                <select 
+                  value={warehouseFilter}
+                  onChange={(e) => setWarehouseFilter(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-[11px] font-bold outline-none focus:ring-4 focus:ring-primary/5 appearance-none"
+                >
+                  <option value="all">All Locations</option>
+                  {state.warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+                </select>
+              </div>
+              <div className="flex items-end">
+                <button 
+                  onClick={() => {
+                    setSearchTerm('');
+                    setCategoryFilter('all');
+                    setWarehouseFilter('all');
+                  }}
+                  className="w-full py-3 bg-rose-50 text-rose-500 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-rose-500 hover:text-white transition-all flex items-center justify-center gap-2"
+                >
+                  <X size={14} /> Clear Inventory Filters
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <div className="flex-1">
         <AnimatePresence mode="wait">
@@ -469,6 +568,10 @@ export default function Inventory({ state, setState }: InventoryProps) {
                       <option>Gown</option>
                       <option>Western</option>
                     </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest">HSN Code</label>
+                    <input name="hsnCode" defaultValue={editingProduct?.hsnCode} className="w-full px-4 md:px-5 py-2.5 md:py-3.5 bg-slate-50 border border-slate-200 rounded-xl md:rounded-2xl text-xs md:text-sm outline-none focus:ring-4 focus:ring-primary/10 font-bold" placeholder="e.g. 5208" />
                   </div>
                 </div>
 
@@ -544,19 +647,13 @@ export default function Inventory({ state, setState }: InventoryProps) {
                           />
                         </div>
                         <div className="space-y-1">
-                          <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest">HEX Code</label>
+                          <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest">HSN Code</label>
                           <div className="flex items-center gap-2">
                              <input 
-                               type="color" 
-                               className="w-10 h-10 p-0 border-0 bg-transparent cursor-pointer"
-                               value={v.colorCode}
-                               onChange={(e) => updateVariant(v.id, 'colorCode', e.target.value)}
-                             />
-                             <input 
-                               placeholder="#000000" 
+                               placeholder="e.g. 5208" 
                                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-[10px] outline-none font-mono font-bold"
-                               value={v.colorCode}
-                               onChange={(e) => updateVariant(v.id, 'colorCode', e.target.value)}
+                               value={v.hsnCode}
+                               onChange={(e) => updateVariant(v.id, 'hsnCode', e.target.value)}
                              />
                           </div>
                         </div>

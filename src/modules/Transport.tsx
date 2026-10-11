@@ -1,5 +1,5 @@
 import React, { useState, Dispatch, SetStateAction } from 'react';
-import { Truck, CheckCircle2, Clock, MapPin, Truck as TruckIcon, FileText, Plus, X, Search, Printer } from 'lucide-react';
+import { Truck, CheckCircle2, Clock, MapPin, Truck as TruckIcon, FileText, Plus, X, Search, Printer, Filter, Calendar } from 'lucide-react';
 import { AppState, TransportLog } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { format } from 'date-fns';
@@ -9,11 +9,15 @@ import ReportHeader from '../components/ReportHeader';
 interface TransportProps {
   state: AppState;
   setState: Dispatch<SetStateAction<AppState>>;
+  setView: (v: any) => void;
 }
 
-export default function Transport({ state, setState }: TransportProps) {
+export default function Transport({ state, setState, setView }: TransportProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [dateFilter, setDateFilter] = useState({ start: '', end: '' });
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [showFilters, setShowFilters] = useState(false);
   const [activeTab, setActiveTab] = useState<'manifest' | 'register' | 'voucher'>('manifest');
   const [selectedLogId, setSelectedLogId] = useState<string | null>(null);
 
@@ -79,12 +83,19 @@ export default function Transport({ state, setState }: TransportProps) {
     }
   };
 
-  const filteredLogs = state.transportLogs.filter(log => 
-    log.lrNo.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    log.transporterName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    log.invoiceNo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (log.supplierName || '').toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredLogs = state.transportLogs.filter(log => {
+    const matchesSearch = log.lrNo.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                        log.transporterName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                        log.invoiceNo.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                        (log.supplierName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                        (log.vehicleNo || '').toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const matchesStatus = statusFilter === 'all' || log.status === statusFilter;
+    const matchesDate = (!dateFilter.start || log.date >= dateFilter.start) && 
+                      (!dateFilter.end || log.date <= dateFilter.end);
+
+    return matchesSearch && matchesStatus && matchesDate;
+  });
 
   // Grouping logic for Register
   const groupedLogs = filteredLogs.reduce((acc, log) => {
@@ -110,49 +121,123 @@ export default function Transport({ state, setState }: TransportProps) {
         {suggestions.map((s, i) => <option key={i} value={s} />)}
       </datalist>
 
-      <div className="flex items-center justify-between flex-wrap gap-4">
+      <div className="flex items-center justify-between flex-wrap gap-6 no-print">
         <div className="flex items-center gap-4">
           <div className="p-5 bg-primary/10 text-primary rounded-[1.5rem] shadow-sm"><Truck size={32} /></div>
           <div>
             <h3 className="text-xl font-black text-slate-800 uppercase tracking-widest">Logistic Terminal</h3>
             <div className="flex gap-4 mt-2">
-              <button 
-                onClick={() => setActiveTab('manifest')}
-                className={cn(
-                  "text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-xl transition-all",
-                  activeTab === 'manifest' ? "bg-primary text-white" : "text-slate-400 hover:bg-slate-100"
-                )}
-              >
-                Tracking Manifest
-              </button>
-              <button 
-                onClick={() => setActiveTab('register')}
-                className={cn(
-                  "text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-xl transition-all",
-                  activeTab === 'register' ? "bg-primary text-white" : "text-slate-400 hover:bg-slate-100"
-                )}
-              >
-                Transport Register
-              </button>
-              <button 
-                onClick={() => setActiveTab('voucher')}
-                className={cn(
-                  "text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-xl transition-all",
-                  activeTab === 'voucher' ? "bg-primary text-white" : "text-slate-400 hover:bg-slate-100"
-                )}
-              >
-                Slip Voucher
-              </button>
+              {[
+                { id: 'manifest', label: 'Tracking Manifest' },
+                { id: 'register', label: 'Transport Register' },
+                { id: 'voucher', label: 'Slip Voucher' },
+              ].map((tab) => (
+                <button 
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id as any)}
+                  className={cn(
+                    "text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-xl transition-all",
+                    activeTab === tab.id ? "bg-primary text-white shadow-lg shadow-primary/20" : "text-slate-400 hover:bg-slate-100"
+                  )}
+                >
+                  {tab.label}
+                </button>
+              ))}
             </div>
           </div>
         </div>
-        <button 
-          onClick={() => setIsModalOpen(true)}
-          className="px-10 py-4 bg-primary text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-2xl shadow-primary/30 flex items-center gap-2"
-        >
-          <Plus size={18} /> Initiate Dispatch
-        </button>
+
+        <div className="flex-1 max-w-2xl flex items-center gap-4">
+          <div className="relative group flex-1">
+            <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-primary transition-colors" />
+            <input 
+              type="text" 
+              list="transport-suggestions"
+              placeholder="Track LR, Vehicle, Transporter..." 
+              className="w-full pl-12 pr-4 py-4 bg-white border border-slate-100 rounded-2xl text-[10px] font-black uppercase tracking-widest focus:ring-8 focus:ring-primary/5 outline-none transition-all shadow-sm"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          <button 
+            onClick={() => setShowFilters(!showFilters)}
+            className={cn(
+              "px-8 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2",
+              showFilters ? "bg-slate-800 text-white shadow-xl shadow-slate-800/20" : "bg-white text-slate-600 border border-slate-100 hover:shadow-md"
+            )}
+          >
+            <Filter size={16} /> {showFilters ? 'Hide' : 'Filter'}
+          </button>
+          <button 
+            onClick={() => setIsModalOpen(true)}
+            className="px-8 py-4 bg-primary text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-2xl shadow-primary/30 flex items-center gap-2"
+          >
+            <Plus size={18} /> Dispatch
+          </button>
+        </div>
       </div>
+
+      <AnimatePresence>
+        {showFilters && (
+          <motion.div 
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="overflow-hidden no-print"
+          >
+            <div className="bg-white border border-slate-100 rounded-[2.5rem] p-8 grid grid-cols-1 md:grid-cols-4 gap-8 shadow-sm">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                  <Calendar size={12} /> From
+                </label>
+                <input 
+                  type="date" 
+                  value={dateFilter.start}
+                  onChange={(e) => setDateFilter(prev => ({ ...prev, start: e.target.value }))}
+                  className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-[11px] font-bold outline-none focus:ring-4 focus:ring-primary/5"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                  <Calendar size={12} /> To
+                </label>
+                <input 
+                  type="date" 
+                  value={dateFilter.end}
+                  onChange={(e) => setDateFilter(prev => ({ ...prev, end: e.target.value }))}
+                  className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-[11px] font-bold outline-none focus:ring-4 focus:ring-primary/5"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                  Status
+                </label>
+                <select 
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-[11px] font-bold outline-none focus:ring-4 focus:ring-primary/5 appearance-none"
+                >
+                  <option value="all">All Status</option>
+                  <option value="in-transit">In Transit</option>
+                  <option value="delivered">Delivered</option>
+                </select>
+              </div>
+              <div className="flex items-end">
+                <button 
+                  onClick={() => {
+                    setSearchTerm('');
+                    setStatusFilter('all');
+                    setDateFilter({ start: '', end: '' });
+                  }}
+                  className="w-full py-3 bg-rose-50 text-rose-500 rounded-xl text-[10px] font-black uppercase tracking-widest border border-rose-100 hover:bg-rose-500 hover:text-white transition-all flex items-center justify-center gap-2"
+                >
+                  <X size={14} /> Clear
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <div className={cn("space-y-10", activeTab === 'register' && "no-print")}>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -193,25 +278,91 @@ export default function Transport({ state, setState }: TransportProps) {
               <TruckIcon size={20} className="text-primary" /> Tracking Manifest
             </h3>
             <div className="flex items-center gap-3">
-              <div className="relative">
-                <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" />
+              <div className="relative group">
+                <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-primary transition-colors" />
                 <input 
                   type="text" 
                   list="transport-suggestions"
-                  placeholder="Search LR, Transporter, Supplier..." 
+                  placeholder="Universal logistics search..." 
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 pr-6 py-2.5 bg-slate-50 rounded-2xl text-[10px] font-black uppercase tracking-widest outline-none border border-transparent focus:border-primary/20 transition-all w-64 shadow-sm"
+                  className="pl-12 pr-6 py-3 bg-white border border-slate-100 rounded-2xl text-[10px] font-black uppercase tracking-widest outline-none focus:ring-8 focus:ring-primary/5 transition-all w-80 shadow-sm"
                 />
               </div>
               <button 
-                onClick={() => {}}
-                className="px-5 py-2.5 bg-primary text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-primary/20 hover:scale-105 active:scale-95 transition-all"
+                onClick={() => setShowFilters(!showFilters)}
+                className={cn(
+                  "px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-sm transition-all flex items-center gap-2",
+                  showFilters ? "bg-slate-800 text-white" : "bg-white text-slate-600 border border-slate-100"
+                )}
               >
-                Search
+                <Filter size={16} /> {showFilters ? 'Hide' : 'Filter'}
               </button>
             </div>
           </div>
+
+          <AnimatePresence>
+            {showFilters && (
+              <motion.div 
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                className="overflow-hidden no-print"
+              >
+                <div className="bg-slate-50/50 border-b border-slate-100 p-8 grid grid-cols-1 md:grid-cols-4 gap-6">
+                  <div className="space-y-2">
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                      <Clock size={12} /> From
+                    </label>
+                    <input 
+                      type="date" 
+                      value={dateFilter.start}
+                      onChange={(e) => setDateFilter(prev => ({ ...prev, start: e.target.value }))}
+                      className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-[10px] font-bold outline-none focus:ring-4 focus:ring-primary/5 shadow-sm font-mono"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                      <Clock size={12} /> To
+                    </label>
+                    <input 
+                      type="date" 
+                      value={dateFilter.end}
+                      onChange={(e) => setDateFilter(prev => ({ ...prev, end: e.target.value }))}
+                      className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-[10px] font-bold outline-none focus:ring-4 focus:ring-primary/5 shadow-sm font-mono"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                       <CheckCircle2 size={12} /> Status
+                    </label>
+                    <select 
+                      value={statusFilter}
+                      onChange={(e) => setStatusFilter(e.target.value)}
+                      className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-[10px] font-bold outline-none focus:ring-4 focus:ring-primary/5 shadow-sm appearance-none"
+                    >
+                      <option value="all">Every Status</option>
+                      <option value="in-transit">In Transit</option>
+                      <option value="delivered">Delivered</option>
+                      <option value="cancelled">Cancelled</option>
+                    </select>
+                  </div>
+                  <div className="flex items-end">
+                    <button 
+                      onClick={() => {
+                        setSearchTerm('');
+                        setDateFilter({ start: '', end: '' });
+                        setStatusFilter('all');
+                      }}
+                      className="w-full py-3 bg-white text-rose-500 border border-rose-100 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-rose-500 hover:text-white transition-all flex items-center justify-center gap-2 shadow-sm"
+                    >
+                      <X size={14} /> Reset Logistics
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
           
           <div className="overflow-x-auto">
             <table className="w-full text-left">

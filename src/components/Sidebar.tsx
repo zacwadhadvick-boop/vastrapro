@@ -11,6 +11,10 @@ import {
   UserCircle, 
   Home, 
   FileBarChart,
+  ArrowLeftRight,
+  ShoppingBag,
+  FileSpreadsheet,
+  BookOpen,
   X
 } from 'lucide-react';
 import { View, User } from '../types';
@@ -55,6 +59,10 @@ export default function Sidebar({ activeView, setView, user, onLogout, isOpen, o
     { id: 'brokers', label: 'Brokers/Agents', icon: UserCircle },
     { id: 'warehouse', label: 'Warehouse Mgt', icon: Home },
     { id: 'accounting', label: 'Accounting', icon: Landmark },
+    { id: 'adjustment', label: 'Bill Adjustment', icon: ArrowLeftRight },
+    { id: 'purchaseReports', label: 'Purchase Reports', icon: ShoppingBag },
+    { id: 'taxation', label: 'Taxation & GST', icon: FileSpreadsheet },
+    { id: 'accountReports', label: 'A/C Reports', icon: BookOpen },
     { id: 'transport', label: 'Transport Log', icon: Truck },
     { id: 'reports', label: 'ERP Reports', icon: FileBarChart },
     { id: 'settings', label: 'System Settings', icon: Settings },

@@ -1,3 +1,22 @@
+export interface BusinessProfile {
+  name: string;
+  address: string;
+  city: string;
+  state: string;
+  pincode: string;
+  gstin: string;
+  phone: string;
+  email: string;
+  website: string;
+  logoUrl?: string;
+  socialLinks: {
+    facebook?: string;
+    instagram?: string;
+    twitter?: string;
+    linkedin?: string;
+  };
+}
+
 export type View = 
   | 'dashboard' 
   | 'inventory' 
@@ -16,6 +35,10 @@ export type View =
   | 'transport' 
   | 'warehouse' 
   | 'reports' 
+  | 'adjustment'
+  | 'taxation'
+  | 'accountReports'
+  | 'purchaseReports'
   | 'settings';
 
 export interface User {
@@ -28,7 +51,7 @@ export interface ProductVariant {
   id: string;
   size: string;
   color: string;
-  colorCode: string;
+  hsnCode: string;
   qty: number;
   warehouseId: string;
 }
@@ -48,6 +71,7 @@ export interface Product {
   discountMax: number; // Percent
   batchNo: string;
   barcode: string;
+  hsnCode?: string;
 }
 
 export interface Area {
@@ -75,6 +99,7 @@ export interface Supplier {
   phone: string;
   address?: string;
   city?: string;
+  balance?: number;
 }
 
 export interface Broker {
@@ -82,6 +107,8 @@ export interface Broker {
   name: string;
   commissionRate: number;
   phone?: string;
+  address?: string;
+  bankAccountNo?: string;
 }
 
 export interface Warehouse {
@@ -106,6 +133,7 @@ export interface PurchaseInvoice {
     category?: string;
     brand?: string;
     baleNo?: string;
+    hsnCode?: string;
   }[];
   totalAmount: number;
   status: 'pending' | 'received';
@@ -146,10 +174,64 @@ export interface Invoice {
   customerId: string;
   brokerId?: string;
   areaId?: string;
-  items: { productId: string; size: string; color: string; qty: number; price: number; discount: number }[];
-  taxRate: number;
-  totalAmount: number;
+  // New fields from image
+  type?: string; // e.g. "Tax Invoice"
+  statusLabel?: string; // e.g. "FINAL"
+  billYear?: string;
+  billNoSuffix?: string;
+  speaker?: string;
+  payMode?: string;
+  customerName?: string;
+  customerAddress?: string;
+  customerCity?: string;
+  customerState?: string;
+  customerPinCode?: string;
+  customerGstNo?: string;
+  customerAadhar?: string;
+  customerPan?: string;
+  customerMobile?: string;
+  ewayBillNo?: string;
+  taxMode?: 'Inclusive' | 'Exclusive';
+  items: { 
+    productId: string; 
+    category?: string;
+    brand?: string;
+    productName?: string;
+    hsnCode?: string;
+    uom?: string;
+    pcs: number; 
+    mtr: number;
+    rate: number; 
+    amount: number;
+    discPerc: number;
+    discAmt: number;
+    netAmount: number;
+    variantId?: string;
+  }[];
+  summary: {
+    totalPcs: number;
+    totalMtr: number;
+    grossValue: number;
+    itemDisc: number;
+    brandDisc: number;
+    taxableAmt: number;
+    cgst: number;
+    sgst: number;
+    igst: number;
+    totalGst: number;
+    roundOff: number;
+    netAmount: number;
+  };
   status: 'pending' | 'partially_paid' | 'paid';
+  gstForm?: string;
+  salesMan?: string;
+  transport?: string;
+  broker?: string;
+  billFor?: string;
+  mBillNo?: string;
+  entryDate?: string;
+  insertedBy?: string;
+  totalAmount: number;
 }
 
 export interface LedgerEntry {
@@ -205,6 +287,48 @@ export interface TransportLog {
   sgst?: number;
 }
 
+export interface BillAdjustment {
+  id: string;
+  entryNo: string;
+  date: string;
+  supplierId: string;
+  creditAccountId: string;
+  brokerId?: string;
+  billDetails: {
+    billId: string;
+    rd: string;
+    rdQty: number;
+    rdAmt: number;
+    deduction: number;
+    schemePerc: number;
+    schemeAmt: number;
+    bcPerc: number;
+    bcAmt: number;
+    intPerc: number;
+    intAmt: number;
+    netAmt: number;
+  }[];
+  partPayments: {
+    vType: string;
+    vNo: string;
+    vDate: string;
+    amount: number;
+    chqNo: string;
+    remark: string;
+  }[];
+  chequeDetail: {
+    amount: number;
+    bankCharges: number;
+    agentComm: number;
+    chqNo: string;
+    date: string;
+    remark: string;
+  };
+  totalBillAmount: number;
+  totalPartAmount: number;
+  balance: number;
+}
+
 export interface AppState {
   products: Product[];
   customers: Customer[];
@@ -216,6 +340,8 @@ export interface AppState {
   invoices: Invoice[];
   ledgerEntries: LedgerEntry[];
   transportLogs: TransportLog[];
+  billAdjustments: BillAdjustment[];
+  businessProfile: BusinessProfile;
   adminCredentials?: {
     username: string;
     password: string;

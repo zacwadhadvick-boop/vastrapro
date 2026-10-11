@@ -1,5 +1,5 @@
-import { useState, Dispatch, SetStateAction, useEffect } from 'react';
-import { Plus, Search, ShoppingCart, User, CreditCard, ChevronRight, Calculator, Trash2, X, Tag, Share2, Printer, CheckCircle2 } from 'lucide-react';
+import React, { useState, Dispatch, SetStateAction, useEffect } from 'react';
+import { Plus, Search, ShoppingCart, User, CreditCard, ChevronRight, Calculator, Trash2, X, Tag, Share2, Printer, CheckCircle2, Truck as TruckIcon } from 'lucide-react';
 import { AppState, Product, Invoice, ProductVariant } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { format } from 'date-fns';
@@ -17,10 +17,11 @@ interface CartItem {
 interface SalesProps {
   state: AppState;
   setState: Dispatch<SetStateAction<AppState>>;
+  setView: (v: any) => void;
   currentView?: string;
 }
 
-export default function Sales({ state, setState, currentView }: SalesProps) {
+export default function Sales({ state, setState, setView, currentView }: SalesProps) {
   const [activeTab, setActiveTab] = useState<'billing' | 'invoices' | 'return' | 'rates'>('billing');
   
   // Sync tab with external view changes
@@ -36,12 +37,75 @@ export default function Sales({ state, setState, currentView }: SalesProps) {
   const [selectedCustomer, setSelectedCustomer] = useState<string>('');
   const [selectedBroker, setSelectedBroker] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [dateFilter, setDateFilter] = useState({ start: '', end: '' });
+  const [customerFilter, setCustomerFilter] = useState('all');
+  const [showFilters, setShowFilters] = useState(false);
   
   // Modal states
   const [selectionModal, setSelectionModal] = useState<Product | null>(null);
   const [returnModal, setReturnModal] = useState<boolean>(false);
   const [priceUpdateModal, setPriceUpdateModal] = useState<boolean>(false);
   const [editingPriceProduct, setEditingPriceProduct] = useState<Product | null>(null);
+
+  // GST Sale Form State
+  const [gstSaleForm, setGstSaleForm] = useState({
+    type: 'Tax Invoice',
+    status: 'FINAL',
+    billNo: (state.invoices.length + 1).toString().padStart(2, '0'),
+    date: format(new Date(), 'yyyy-MM-dd'),
+    year: '2026',
+    speaker: '',
+    payMode: '(C)ash/(D)ebit R CASH',
+    customerName: '',
+    customerAddress: '',
+    customerCity: '',
+    customerGstNo: '',
+    customerAadhar: '',
+    customerPan: '',
+    customerPinCode: '',
+    customerMobile: '',
+    customerState: '09-UTTAR PRADESH',
+    ewayBillNo: '',
+    taxMode: 'Exclusive' as 'Inclusive' | 'Exclusive',
+    gstForm: 'GST SALE (IN-STATE)',
+    salesMan: '',
+    transport: '',
+    broker: '',
+    billFor: '',
+    mBillNo: '',
+  });
+
+  const [saleItems, setSaleItems] = useState<any[]>([]);
+
+  const calculateGstSaleTotals = () => {
+    const totalPcs = saleItems.reduce((acc, item) => acc + (parseFloat(item.pcs) || 0), 0);
+    const totalMtr = saleItems.reduce((acc, item) => acc + (parseFloat(item.mtr) || 0), 0);
+    const grossValue = saleItems.reduce((acc, item) => acc + (parseFloat(item.amount) || 0), 0);
+    const itemDisc = saleItems.reduce((acc, item) => acc + (parseFloat(item.discAmt) || 0), 0);
+    
+    const taxableAmt = grossValue - itemDisc;
+    // Assuming 5% GST (2.5% CGST + 2.5% SGST) as in image
+    const cgst = taxableAmt * 0.025;
+    const sgst = taxableAmt * 0.025;
+    const igst = 0;
+    const totalGst = cgst + sgst + igst;
+    const netAmount = taxableAmt + totalGst;
+    const roundOff = Math.round(netAmount) - netAmount;
+
+    return {
+      totalPcs,
+      totalMtr,
+      grossValue,
+      itemDisc,
+      taxableAmt,
+      cgst,
+      sgst,
+      igst,
+      totalGst,
+      roundOff,
+      netAmount: Math.round(netAmount)
+    };
+  };
 
   const calculateItemTotal = (item: CartItem) => {
     const discountedPrice = item.price * (1 - item.discountPercent / 100);
@@ -68,22 +132,69 @@ export default function Sales({ state, setState, currentView }: SalesProps) {
   };
 
   const addToCart = (product: Product, variant: ProductVariant) => {
-    const existingIndex = cart.findIndex(i => i.product.id === product.id && i.variant.id === variant.id);
-    if (existingIndex > -1) {
-      const newCart = [...cart];
-      newCart[existingIndex].qty += 1;
-      setCart(newCart);
-    } else {
-      setCart([...cart, { 
-        product, 
-        variant, 
-        qty: 1, 
-        price: product.sellingPrice,
-        discountPercent: 0
-      }]);
-    }
+    const newItem = {
+      productId: product.id,
+      variantId: variant.id,
+      category: product.category,
+      brand: product.brand,
+      productName: product.name,
+      hsnCode: product.hsnCode || '-',
+      pcs: '1',
+      mtr: '0.00',
+      rate: product.sellingPrice.toString(),
+      amount: product.sellingPrice.toString(),
+      discPerc: '0',
+      discAmt: '0',
+      uom: 'Pcs',
+      netAmount: product.sellingPrice.toString()
+    };
+    setSaleItems([...saleItems, newItem]);
     setSelectionModal(null);
   };
+
+  const updateSaleItem = (idx: number, updates: any) => {
+    setSaleItems(prev => {
+      const items = [...prev];
+      const item = { ...items[idx], ...updates };
+      
+      const pcs = parseFloat(item.pcs) || 0;
+      const mtr = parseFloat(item.mtr) || 0;
+      const rate = parseFloat(item.rate) || 0;
+      const discPerc = parseFloat(item.discPerc) || 0;
+      
+      const grossAmount = (pcs || mtr) * rate;
+      const discAmt = grossAmount * (discPerc / 100);
+      const amount = grossAmount - discAmt;
+      
+      items[idx] = {
+        ...item,
+        amount: amount.toFixed(2),
+        discAmt: discAmt.toFixed(2),
+        netAmount: amount.toFixed(2)
+      };
+      return items;
+    });
+  };
+
+  const removeSaleItem = (idx: number) => {
+    setSaleItems(prev => prev.filter((_, i) => i !== idx));
+  };
+
+  // Autopopulate Customer Info
+  useEffect(() => {
+    if (selectedCustomer) {
+      const customer = state.customers.find(c => c.id === selectedCustomer);
+      if (customer) {
+        setGstSaleForm(prev => ({
+          ...prev,
+          customerName: customer.name,
+          customerGstNo: customer.gstin,
+          customerMobile: customer.phone,
+          customerCity: state.areas.find(a => a.id === customer.areaId)?.city || '',
+        }));
+      }
+    }
+  }, [selectedCustomer, state.customers, state.areas]);
 
   const updateCartItem = (idx: number, field: keyof CartItem, value: any) => {
     const newCart = [...cart];
@@ -91,79 +202,122 @@ export default function Sales({ state, setState, currentView }: SalesProps) {
     setCart(newCart);
   };
 
-  const handleCreateInvoice = () => {
-    if (cart.length === 0) return;
+  const totals = calculateGstSaleTotals();
+  const totalNet = totals.netAmount;
+  const totalPcs = totals.totalPcs;
+  const totalMtr = totals.totalMtr;
+  const totalGross = totals.grossValue;
+  const totalDiscAmt = totals.itemDisc;
 
-    // Validate Stock
-    for (const item of cart) {
-      if (item.qty > item.variant.qty) {
-        alert(`Insufficient stock for ${item.product.name} (Size ${item.variant.size}). Available: ${item.variant.qty}`);
-        return;
-      }
+  const handleCreateInvoice = () => {
+    if (saleItems.length === 0) {
+      alert('Please add at least one item to the bill.');
+      return;
     }
-    
+
+    const nextBillNo = (state.invoices.length + 1).toString().padStart(2, '0');
     const invoiceId = Math.random().toString(36).substr(2, 9);
-    const invoiceNo = `INV-${Date.now().toString().slice(-6)}`;
+    const invoiceNo = `INV-${gstSaleForm.billNo || nextBillNo}`;
     
     const newInvoice: Invoice = {
       id: invoiceId,
       invoiceNo: invoiceNo,
-      date: new Date().toISOString(),
+      date: new Date(gstSaleForm.date).toISOString(),
       customerId: selectedCustomer || 'Walk-in Customer',
       brokerId: selectedBroker,
-      items: cart.map(item => ({
-        productId: item.product.id,
-        size: item.variant.size,
-        color: item.variant.color,
-        qty: item.qty,
-        price: item.price,
-        discount: item.discountPercent
+      type: gstSaleForm.type,
+      billYear: gstSaleForm.year,
+      speaker: gstSaleForm.speaker,
+      payMode: gstSaleForm.payMode,
+      customerName: gstSaleForm.customerName,
+      customerAddress: gstSaleForm.customerAddress,
+      customerCity: gstSaleForm.customerCity,
+      customerState: gstSaleForm.customerState,
+      customerPinCode: gstSaleForm.customerPinCode,
+      customerGstNo: gstSaleForm.customerGstNo,
+      customerAadhar: gstSaleForm.customerAadhar,
+      customerPan: gstSaleForm.customerPan,
+      customerMobile: gstSaleForm.customerMobile,
+      ewayBillNo: gstSaleForm.ewayBillNo,
+      taxMode: gstSaleForm.taxMode,
+      status: 'paid',
+      statusLabel: 'Paid',
+      items: saleItems.map(item => ({
+        productId: item.productId,
+        category: item.category,
+        brand: item.brand,
+        productName: item.productName,
+        hsnCode: item.hsnCode,
+        uom: item.uom,
+        pcs: parseFloat(item.pcs) || 0,
+        mtr: parseFloat(item.mtr) || 0,
+        rate: parseFloat(item.rate) || 0,
+        amount: parseFloat(item.amount) || 0,
+        discPerc: parseFloat(item.discPerc) || 0,
+        discAmt: parseFloat(item.discAmt) || 0,
+        netAmount: parseFloat(item.netAmount) || 0,
+        variantId: item.variantId
       })),
-      taxRate: 12,
-      totalAmount: grandTotal,
-      status: 'paid'
+      totalAmount: totalNet,
+      summary: {
+        totalPcs: totalPcs,
+        totalMtr: totalMtr,
+        grossValue: totalGross,
+        itemDisc: totalDiscAmt,
+        brandDisc: 0,
+        taxableAmt: totalNet,
+        cgst: 0,
+        sgst: 0,
+        igst: 0,
+        totalGst: 0,
+        roundOff: 0,
+        netAmount: totalNet
+      },
+      transport: gstSaleForm.transport,
+      broker: gstSaleForm.broker
     };
 
-    // Create Ledger Entry
-    const newLedgerEntry = {
-      id: `acc-${Date.now()}`,
-      date: new Date().toISOString(),
-      description: `Sales Invoice ${invoiceNo}`,
-      amount: grandTotal,
-      type: 'credit' as const,
-      entityId: selectedCustomer || undefined,
-      category: 'Sales'
-    };
-
-    // Update Inventory, Invoices, and Ledger
-    setState(prev => {
-      const newProducts = prev.products.map(p => {
-        const cartItemsForThisProduct = cart.filter(ci => ci.product.id === p.id);
-        if (cartItemsForThisProduct.length > 0) {
+    setState(prev => ({
+      ...prev,
+      invoices: [...prev.invoices, newInvoice],
+      // Deduct inventory
+      products: prev.products.map(p => {
+        const lineItem = saleItems.filter(si => si.productId === p.id);
+        if (lineItem.length > 0) {
           return {
             ...p,
             variants: p.variants.map(v => {
-              const cartItem = cartItemsForThisProduct.find(ci => ci.variant.id === v.id);
-              return cartItem ? { ...v, qty: v.qty - cartItem.qty } : v;
+              const variantMatch = lineItem.find(li => li.variantId === v.id);
+              if (variantMatch) {
+                return { ...v, qty: v.qty - (parseFloat(variantMatch.pcs) || 0) };
+              }
+              return v;
             })
           };
         }
         return p;
-      });
+      }),
+      // Add ledger entry
+      ledgerEntries: [
+        ...prev.ledgerEntries,
+        {
+          id: `sale-${newInvoice.invoiceNo}`,
+          date: newInvoice.date,
+          description: `Sale to ${newInvoice.customerName} (${newInvoice.invoiceNo})`,
+          amount: newInvoice.totalAmount,
+          type: 'credit',
+          category: 'Sales'
+        }
+      ]
+    }));
 
-      return {
-        ...prev,
-        invoices: [newInvoice, ...prev.invoices],
-        products: newProducts,
-        ledgerEntries: [newLedgerEntry, ...prev.ledgerEntries]
-      };
-    });
-
-    setCart([]);
-    setSelectedCustomer('');
-    setSelectedBroker('');
-    setActiveTab('invoices');
-    setPreviewInvoice(newInvoice);
+    alert(`Invoice ${invoiceNo} Saved Successfully!\nInventory & Ledger Synchronized.`);
+    setSaleItems([]);
+    setGstSaleForm(prev => ({
+      ...prev, 
+      billNo: (state.invoices.length + 2).toString().padStart(2, '0')
+    }));
+    setView('sales:invoices');
   };
 
   const handleProcessReturn = (invoice: Invoice) => {
@@ -188,8 +342,8 @@ export default function Sales({ state, setState, currentView }: SalesProps) {
           return {
             ...p,
             variants: p.variants.map(v => {
-              const returnedItem = itemsToReturn.find(item => item.size === v.size && item.color === v.color);
-              return returnedItem ? { ...v, qty: v.qty + returnedItem.qty } : v;
+              const returnedItem = itemsToReturn.find(item => item.variantId === v.id);
+              return returnedItem ? { ...v, qty: v.qty + returnedItem.pcs } : v;
             })
           };
         }
@@ -223,6 +377,18 @@ export default function Sales({ state, setState, currentView }: SalesProps) {
     p.brand.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const filteredInvoices = state.invoices.filter(inv => {
+    const customer = state.customers.find(c => c.id === inv.customerId);
+    const matchesSearch = inv.invoiceNo.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                        (customer?.name || '').toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const matchesCustomer = customerFilter === 'all' || inv.customerId === customerFilter;
+    const matchesDate = (!dateFilter.start || inv.date >= dateFilter.start) && 
+                      (!dateFilter.end || inv.date <= dateFilter.end);
+    
+    return matchesSearch && matchesCustomer && matchesDate;
+  });
+
   const suggestions = Array.from(new Set([
     ...state.products.map(p => p.name),
     ...state.products.map(p => p.brand),
@@ -244,13 +410,98 @@ export default function Sales({ state, setState, currentView }: SalesProps) {
     window.print();
   };
 
+  // Keyboard Shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (currentView !== 'sales:billing') return;
+      
+      if (e.key === 'F2') {
+        e.preventDefault();
+        setSaleItems([]);
+        const nextNo = (state.invoices.length + 1).toString().padStart(2, '0');
+        setGstSaleForm(prev => ({...prev, billNo: nextNo}));
+        alert('Form reset for New Bill. Bill No: ' + nextNo);
+      }
+      if (e.key === 'F10') {
+        e.preventDefault();
+        setView('dashboard');
+      }
+      if (e.key === 's' && e.ctrlKey) {
+        e.preventDefault();
+        handleCreateInvoice();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [currentView, state.invoices.length]);
+
   const handleDeleteInvoice = (id: string) => {
-    if (confirm('Are you sure you want to delete this invoice? This will NOT automatically reverse inventory.')) {
-      setState(prev => ({
-        ...prev,
-        invoices: prev.invoices.filter(inv => inv.id !== id)
-      }));
+    if (confirm('Are you sure you want to delete this invoice? This will reverse inventory and ledger entries.')) {
+      const invToDel = state.invoices.find(v => v.id === id);
+      setState(prev => {
+        let nextProducts = prev.products;
+        if (invToDel) {
+          nextProducts = prev.products.map(p => {
+            const itemMatches = invToDel.items.filter(ii => ii.productId === p.id);
+            if (itemMatches.length > 0) {
+              return {
+                ...p,
+                variants: p.variants.map(v => {
+                  const match = itemMatches.find(im => im.variantId === v.id);
+                  return match ? { ...v, qty: v.qty + match.pcs } : v;
+                })
+              };
+            }
+            return p;
+          });
+        }
+        return {
+          ...prev,
+          invoices: prev.invoices.filter(inv => inv.id !== id),
+          products: nextProducts,
+          ledgerEntries: prev.ledgerEntries.filter(le => le.id !== `sale-${invToDel?.invoiceNo}`)
+        };
+      });
+      alert('Invoice deleted and stock reversed successfully.');
     }
+  };
+
+  const handleModifyInvoice = (inv: Invoice) => {
+    setGstSaleForm({
+      billNo: inv.invoiceNo.split('-').pop() || '',
+      date: inv.date.split('T')[0],
+      customerName: inv.customerName || '',
+      customerId: inv.customerId,
+      customerMobile: inv.customerMobile || '',
+      customerAddress: inv.customerAddress || '',
+      customerCity: inv.customerCity || '',
+      customerGstNo: inv.customerGstNo || '',
+      customerPan: inv.customerPan || '',
+      transport: inv.transport || '',
+      broker: inv.broker || '',
+      type: inv.type,
+      status: 'active',
+      year: inv.billYear || '2026-27',
+      speaker: inv.speaker || 'No',
+      payMode: inv.payMode || 'Credit',
+      customerState: inv.customerState || '',
+      customerPinCode: inv.customerPinCode || '',
+      customerAadhar: inv.customerAadhar || '',
+      ewayBillNo: inv.ewayBillNo || '',
+      taxMode: inv.taxMode || 'GST'
+    });
+    setSaleItems(inv.items.map(item => ({
+      ...item,
+      pcs: item.pcs.toString(),
+      mtr: item.mtr.toString(),
+      rate: item.rate.toString(),
+      amount: item.amount.toString(),
+      discPerc: item.discPerc.toString(),
+      discAmt: item.discAmt.toString(),
+      netAmount: item.netAmount.toString()
+    })));
+    setSelectedCustomer(inv.customerId);
+    setView('sales:billing');
   };
 
   const shareOnWhatsApp = (inv: Invoice) => {
@@ -262,18 +513,26 @@ export default function Sales({ state, setState, currentView }: SalesProps) {
   };
 
   const getSubtotal = (inv: Invoice) => {
+    if (inv.summary) return inv.summary.grossValue;
     return inv.items.reduce((acc, item) => {
-      const discounted = item.price * (1 - item.discount / 100);
-      return acc + (discounted * item.qty);
+      const price = (item as any).price || item.rate;
+      const qty = (item as any).qty || item.pcs;
+      const discount = (item as any).discount || item.discPerc;
+      const discounted = price * (1 - discount / 100);
+      return acc + (discounted * qty);
     }, 0);
   };
 
   const getTax = (inv: Invoice) => {
+    if (inv.summary) return inv.summary.totalGst;
     return inv.items.reduce((acc, item) => {
       const product = state.products.find(p => p.id === item.productId);
       const gst = product?.sellGst || 12;
-      const discounted = item.price * (1 - item.discount / 100);
-      return acc + (discounted * item.qty * (gst / 100));
+      const price = (item as any).price || item.rate;
+      const qty = (item as any).qty || item.pcs;
+      const discount = (item as any).discount || item.discPerc;
+      const discounted = price * (1 - discount / 100);
+      return acc + (discounted * qty * (gst / 100));
     }, 0);
   };
 
@@ -322,248 +581,394 @@ export default function Sales({ state, setState, currentView }: SalesProps) {
       </div>
 
       {activeTab === 'billing' ? (
-        <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-8 min-h-0">
-          {/* Product selection */}
-          <div className="lg:col-span-12 xl:col-span-12 flex flex-col space-y-6">
-             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
-                <div className="relative group flex-1">
-                  <div className="absolute inset-y-0 left-0 pl-5 md:pl-7 flex items-center pointer-events-none text-slate-300 group-focus-within:text-primary transition-colors">
-                    <Search size={20} className="md:w-6 md:h-6" strokeWidth={2.5} />
-                  </div>
-                  <input 
-                    type="text" 
-                    list="sales-suggestions"
-                    placeholder="Search articles..." 
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-12 md:pl-16 pr-8 py-4 md:py-6 bg-white border border-slate-100 rounded-[1.5rem] md:rounded-[2.5rem] outline-none focus:ring-[8px] md:focus:ring-[12px] focus:ring-primary/5 transition-all font-black text-lg md:text-xl shadow-xl shadow-slate-200/20 placeholder:text-slate-200"
-                  />
-                  <div className="absolute right-4 top-1/2 -translate-y-1/2 hidden md:block px-4 py-2 bg-slate-50 rounded-2xl text-[10px] font-black text-slate-400 uppercase tracking-widest border border-slate-100 shadow-sm">
-                    {filteredProducts.length} ARTICLES
-                  </div>
-                </div>
-                <button 
-                  onClick={() => {}}
-                  className="px-8 py-4 md:px-10 md:py-6 bg-primary text-white rounded-[1.5rem] md:rounded-[2.5rem] font-black uppercase tracking-[0.2em] text-[10px] md:text-xs shadow-xl shadow-primary/30 hover:scale-105 active:scale-95 transition-all"
-                >
-                  Search
-                </button>
+        <div className="flex-1 flex flex-col min-h-0 bg-slate-900 overflow-hidden">
+          {/* GST SALE Header */}
+          <div className="bg-sky-700 text-white px-4 py-1.5 flex items-center justify-between text-[11px] font-black uppercase tracking-widest border-b border-sky-800">
+             <div className="flex items-center gap-4">
+                <span className="bg-white text-sky-700 px-2 py-0.5 rounded">GST SALE</span>
+                <span>{`{Bill Information}`}</span>
              </div>
-
-             <div className="flex-1 overflow-y-auto pr-4 -mr-4 py-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-               <AnimatePresence>
-                 {filteredProducts.map(p => (
-                   <motion.button 
-                     layout
-                     initial={{ opacity: 0, scale: 0.95 }}
-                     animate={{ opacity: 1, scale: 1 }}
-                     key={p.id}
-                     onClick={() => handleOpenSelection(p)}
-                     className="p-7 bg-white border border-slate-100 rounded-[3rem] hover:shadow-[0_30px_60px_-15px_rgba(0,0,0,0.1)] hover:border-primary/30 transition-all text-left flex flex-col gap-6 group relative overflow-hidden active:scale-[0.98]"
-                   >
-                     {/* Card Header */}
-                     <div className="flex items-center gap-5">
-                        <div className="w-16 h-16 bg-slate-50 text-slate-400 rounded-[1.75rem] flex items-center justify-center font-black text-3xl group-hover:bg-primary group-hover:text-white transition-all shadow-inner group-hover:shadow-primary/30 group-hover:-translate-y-1">
-                          {p.name[0].toUpperCase()}
-                        </div>
-                        <div className="min-w-0">
-                           <h4 className="font-black text-slate-900 truncate text-base leading-tight">{p.name}</h4>
-                           <div className="flex items-center gap-2 mt-1">
-                             <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.1em]">{p.brand}</p>
-                             <div className="w-1 h-1 bg-slate-200 rounded-full" />
-                             <p className="text-[10px] text-primary/60 font-black uppercase tracking-widest">{p.category || 'Apparel'}</p>
-                           </div>
-                        </div>
-                     </div>
-
-                     {/* Price Tag */}
-                     <div className="mt-2 flex items-end justify-between">
-                        <div className="space-y-1">
-                           <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest pl-1">Selling Rate</p>
-                           <p className="text-2xl font-black text-slate-900 tracking-tighter">₹{p.sellingPrice}<span className="text-[10px] text-slate-300 ml-1">GST Incl.</span></p>
-                        </div>
-                        <div className="text-right">
-                           <div className="bg-emerald-50 px-4 py-2 rounded-2xl border border-emerald-100/50 flex flex-col items-center group-hover:bg-emerald-500 group-hover:border-emerald-500 transition-all">
-                              <span className="text-[8px] text-emerald-600/50 font-black uppercase group-hover:text-white/50">STOCK</span>
-                              <span className="text-sm font-black text-emerald-600 group-hover:text-white leading-none mt-1">
-                                {p.variants.reduce((acc, v) => acc + v.qty, 0)}
-                              </span>
-                           </div>
-                        </div>
-                     </div>
-                   </motion.button>
-                 ))}
-               </AnimatePresence>
+             <div className="flex items-center gap-4">
+                <div className="flex items-center gap-1">
+                   <CheckCircle2 size={12} className="text-emerald-400" />
+                   <span>PRV.BILL NO - 94</span>
+                </div>
+                <div className="px-2 py-0.5 bg-blue-900 rounded">AMT - 4700 (CASH)</div>
              </div>
           </div>
 
-          {/* Cart Section */}
-          <div className="lg:col-span-12 xl:col-span-12 flex flex-col bg-white rounded-[2rem] md:rounded-[3rem] shadow-2xl border border-slate-50 overflow-hidden xl:sticky xl:top-6 h-auto xl:h-[calc(100vh-140px)] min-h-[400px] xl:min-h-[650px]">
-             <div className="p-8 bg-slate-50 flex items-center justify-between border-b border-slate-100 flex-shrink-0">
-                <div className="flex items-center gap-4">
-                   <div className="w-12 h-12 bg-primary text-white rounded-2xl flex items-center justify-center shadow-xl shadow-primary/20">
-                      <ShoppingCart size={20} />
+          <div className="flex-1 flex flex-col md:flex-row min-h-0 p-1 gap-1">
+             {/* Left Main Section */}
+             <div className="flex-1 flex flex-col gap-1 min-h-0">
+                {/* Header Information Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-1 text-[9px] font-bold">
+                   {/* Bill Details */}
+                   <div className="md:col-span-3 bg-slate-100 p-2 space-y-1 rounded">
+                      <div className="grid grid-cols-2 gap-1 items-center">
+                         <div className="text-slate-500">TYPE</div>
+                         <select 
+                           className="bg-white border border-slate-300 text-[8px] font-black uppercase outline-none px-1"
+                           value={gstSaleForm.type}
+                           onChange={e => setGstSaleForm({...gstSaleForm, type: e.target.value})}
+                         >
+                            <option>Tax Invoice</option>
+                            <option>Retail Invoice</option>
+                            <option>Proforma</option>
+                         </select>
+                      </div>
+                      <div className="grid grid-cols-2 gap-1 items-center">
+                         <div className="text-slate-500">STATUS</div>
+                         <div className="text-emerald-600 font-black">{gstSaleForm.status}</div>
+                         <div className="text-slate-500">YEAR</div>
+                         <div className="text-slate-900 italic">FY 2026-27</div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-1 mt-1">
+                         <div className="text-rose-600 font-black flex flex-col">
+                            BILL NO
+                            <span className="text-emerald-600 text-xs">{gstSaleForm.billNo}</span>
+                         </div>
+                         <div className="text-emerald-600 font-black flex flex-col">
+                            DATE
+                            <input 
+                              type="date" 
+                              className="bg-white border border-slate-300 text-[8px] font-black outline-none px-1 h-5"
+                              value={gstSaleForm.date}
+                              onChange={e => setGstSaleForm({...gstSaleForm, date: e.target.value})}
+                            />
+                         </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-1 items-center">
+                         <div className="text-slate-500 uppercase">Speaker</div>
+                         <input className="bg-white border border-slate-300 text-[8px] uppercase outline-none px-1" value={gstSaleForm.speaker} onChange={e => setGstSaleForm({...gstSaleForm, speaker: e.target.value})} placeholder="..." />
+                      </div>
+                      <div className="mt-1 pt-1 border-t border-slate-200">
+                         <div className="text-rose-600 font-black uppercase leading-tight text-[7px] mb-1">PAY MODE</div>
+                         <select 
+                           className="w-full bg-white border border-slate-300 text-[8px] font-black uppercase outline-none px-1 mb-1"
+                           value={gstSaleForm.payMode}
+                           onChange={e => setGstSaleForm({...gstSaleForm, payMode: e.target.value})}
+                         >
+                            <option>(C)ash/(D)ebit R CASH</option>
+                            <option>(B)ank / Online</option>
+                            <option>(U)PI Payment</option>
+                            <option>(H)awala / Adjustment</option>
+                         </select>
+                         <div className="text-blue-600 font-black text-[7px] uppercase leading-none">{format(new Date(), 'dd-MM-yyyy HH:mm')} SYSTEM_ACTIVE</div>
+                      </div>
                    </div>
-                   <div>
-                      <h3 className="font-black text-slate-900 uppercase tracking-[0.1em] text-sm">Counter Billing</h3>
-                      <p className="text-[10px] text-slate-400 font-bold uppercase mt-1 flex items-center gap-1.5">
-                        <CheckCircle2 size={10} className="text-emerald-500" />
-                        {cart.length} Articles Selected
-                      </p>
+
+                   {/* Customer Details Content */}
+                   <div className="md:col-span-9 bg-slate-50 p-2 rounded flex flex-col">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-blue-900 font-black uppercase text-[10px]">CUSTOMER</span>
+                        <div className="flex-1 relative group">
+                           <input 
+                             type="text"
+                             className="w-full bg-white border border-slate-300 px-2 py-1 text-rose-600 font-black uppercase text-xs focus:ring-1 focus:ring-primary outline-none"
+                             value={gstSaleForm.customerName}
+                             onChange={(e) => setGstSaleForm({...gstSaleForm, customerName: e.target.value})}
+                             placeholder="Search Customer..."
+                           />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-1">
+                         <div className="flex flex-col gap-0.5">
+                            <span className="text-blue-600 uppercase">ADDRESS</span>
+                            <input className="bg-white border border-slate-200 p-0.5 text-[8px] uppercase" value={gstSaleForm.customerAddress} onChange={e => setGstSaleForm({...gstSaleForm, customerAddress: e.target.value})} />
+                         </div>
+                         <div className="flex flex-col gap-0.5">
+                             <span className="text-blue-600 uppercase">CITY</span>
+                             <input className="bg-white border border-slate-200 p-0.5 text-[8px] uppercase" value={gstSaleForm.customerCity} onChange={e => setGstSaleForm({...gstSaleForm, customerCity: e.target.value})} />
+                         </div>
+                         <div className="flex flex-col gap-0.5">
+                             <span className="text-blue-600 uppercase">STATE</span>
+                             <span className="text-slate-900 font-black uppercase">{gstSaleForm.customerState}</span>
+                         </div>
+                         <div className="flex flex-col gap-0.5">
+                             <span className="text-blue-600 uppercase">PIN CODE</span>
+                             <input className="bg-white border border-slate-200 p-0.5 text-[8px] uppercase" value={gstSaleForm.customerPinCode} onChange={e => setGstSaleForm({...gstSaleForm, customerPinCode: e.target.value})} />
+                         </div>
+                         <div className="flex flex-col gap-0.5">
+                             <span className="text-blue-600 uppercase">GST NO</span>
+                             <input className="bg-white border border-slate-200 p-0.5 text-[8px] uppercase font-black text-rose-500" value={gstSaleForm.customerGstNo} onChange={e => setGstSaleForm({...gstSaleForm, customerGstNo: e.target.value})} />
+                         </div>
+                         <div className="flex flex-col gap-0.5">
+                             <span className="text-blue-600 uppercase">AADHAR</span>
+                             <input className="bg-white border border-slate-200 p-0.5 text-[8px] uppercase" value={gstSaleForm.customerAadhar} onChange={e => setGstSaleForm({...gstSaleForm, customerAadhar: e.target.value})} />
+                         </div>
+                         <div className="flex flex-col gap-0.5">
+                             <span className="text-blue-600 uppercase">PAN</span>
+                             <input className="bg-white border border-slate-200 p-0.5 text-[8px] uppercase" value={gstSaleForm.customerPan} onChange={e => setGstSaleForm({...gstSaleForm, customerPan: e.target.value})} />
+                         </div>
+                         <div className="flex flex-col gap-0.5">
+                             <span className="text-blue-600 uppercase">MOBILE</span>
+                             <input className="bg-white border border-slate-200 p-0.5 text-[8px] uppercase" value={gstSaleForm.customerMobile} onChange={e => setGstSaleForm({...gstSaleForm, customerMobile: e.target.value})} />
+                         </div>
+                      </div>
+                      <div className="mt-2 text-[8px] flex items-center justify-between border-t border-slate-200 pt-1">
+                         <div className="flex items-center gap-4">
+                            <label className="flex items-center gap-1"><input type="checkbox" /> CASH PARTY</label>
+                            <span className="text-rose-600 font-bold uppercase">{gstSaleForm.customerName}</span>
+                         </div>
+                         <div className="flex items-center gap-4">
+                            <span className="text-blue-600 uppercase font-black">E-WAY</span>
+                            <span className="text-slate-900 border border-slate-300 px-2 uppercase">SALE ON Nett Cash</span>
+                            <span className="text-black bg-yellow-100 border border-slate-300 px-2 uppercase">C.MOBILE</span>
+                         </div>
+                      </div>
                    </div>
                 </div>
-                <button onClick={() => setCart([])} className="px-4 py-2 text-[9px] font-black text-red-500 hover:bg-red-50 rounded-xl transition-all uppercase tracking-widest border border-red-100">Clear</button>
-             </div>
 
-             <div className="flex-1 overflow-y-auto px-6 py-6 space-y-3 bg-slate-50/30">
-                <AnimatePresence initial={false}>
-                   {cart.length === 0 ? (
-                      <div className="h-full flex flex-col items-center justify-center text-slate-300 py-32">
-                         <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mb-6">
-                            <Calculator size={40} strokeWidth={1.5} className="opacity-30" />
-                         </div>
-                         <p className="font-black uppercase tracking-[0.25em] text-[9px] text-center max-w-[200px] leading-relaxed">Article Basket is empty. Search products to begin billing.</p>
-                      </div>
-                   ) : (
-                      cart.map((item, idx) => (
-                         <motion.div 
-                           key={`${item.product.id}-${item.variant.id}-${idx}`}
-                           initial={{ opacity: 0, y: 10 }}
-                           animate={{ opacity: 1, y: 0 }}
-                           exit={{ opacity: 0, scale: 0.95 }}
-                           className="p-5 bg-white rounded-[2rem] border border-slate-100 shadow-sm group hover:shadow-md transition-all border-l-4 border-l-slate-200 hover:border-l-primary"
-                         >
-                            <div className="flex items-start justify-between">
-                               <div className="flex-1 min-w-0 pr-4">
-                                  <h5 className="font-black text-slate-900 text-sm truncate">{item.product.name}</h5>
-                                  <div className="flex items-center gap-3 mt-1.5">
-                                     <div className="flex items-center gap-1.5 px-2 py-0.5 bg-slate-100 rounded-lg">
-                                        <div className="w-2 h-2 rounded-full shadow-sm" style={{ backgroundColor: item.variant.colorCode }} />
-                                        <span className="text-[8px] font-black uppercase text-slate-500">{item.variant.color}</span>
-                                     </div>
-                                     <span className="text-[8px] font-black px-2 py-0.5 bg-slate-100 rounded-lg text-slate-500">SIZE: {item.variant.size}</span>
-                                  </div>
-                               </div>
-                               <button 
-                                 onClick={() => setCart(cart.filter((_, i) => i !== idx))}
-                                 className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-300 hover:text-red-500 hover:bg-red-50 transition-all"
+                {/* Items Table Section */}
+                <div className="flex-1 bg-white flex flex-col min-h-0 border-y border-slate-300">
+                   <table className="w-full text-center text-[9px] font-black border-collapse">
+                      <thead className="sticky top-0 bg-sky-900 text-white uppercase tracking-tighter">
+                         <tr className="border-b border-white/20">
+                            <th className="border-r border-white/20 py-1 w-8">SR</th>
+                            <th className="border-r border-white/20 py-1 text-left px-2">CATEGORY</th>
+                            <th className="border-r border-white/20 py-1 text-left px-2">BRAND *</th>
+                            <th className="border-r border-white/20 py-1 text-left px-2">PRODUCT *</th>
+                            <th className="border-r border-white/20 py-1 w-16">HSN</th>
+                            <th className="border-r border-white/20 py-1 w-12">UOM D/F</th>
+                            <th className="border-r border-white/20 py-1 w-10">PCS</th>
+                            <th className="border-r border-white/20 py-1 w-10">Mtr</th>
+                            <th className="border-r border-white/20 py-1 w-16">Rate</th>
+                            <th className="border-r border-white/20 py-1 w-20">Amount</th>
+                            <th className="border-r border-white/20 py-1 w-10">D %</th>
+                            <th className="py-1 w-16">DISC</th>
+                         </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 overflow-y-auto">
+                        {saleItems.map((item, idx) => (
+                          <tr key={idx} className="bg-white hover:bg-slate-50 h-6 group">
+                            <td 
+                              className="border-r border-slate-200 bg-slate-50 cursor-pointer hover:bg-rose-500 hover:text-white transition-colors"
+                              onClick={() => removeSaleItem(idx)}
+                              title="Click to remove row"
+                            >
+                              {idx + 1}
+                            </td>
+                            <td className="border-r border-slate-200 text-left px-2 uppercase opacity-70">{item.category}</td>
+                            <td className="border-r border-slate-200 text-left px-2 uppercase opacity-80">{item.brand}</td>
+                            <td className="border-r border-slate-200 text-left px-2 uppercase text-blue-800 font-bold">{item.productName}</td>
+                            <td className="border-r border-slate-200">{item.hsnCode}</td>
+                            <td className="border-r border-slate-200">
+                               <select 
+                                 className="w-full bg-transparent outline-none appearance-none text-center"
+                                 value={item.uom}
+                                 onChange={e => updateSaleItem(idx, { uom: e.target.value })}
                                >
-                                  <X size={14} />
-                               </button>
-                            </div>
-
-                            <div className="mt-5 grid grid-cols-3 gap-3 border-t border-slate-50 pt-5">
-                               <div className="space-y-1.5">
-                                  <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest pl-1">Qty</label>
-                                  <div className="relative">
-                                    <input 
-                                      type="number" 
-                                      min="1"
-                                      max={item.variant.qty}
-                                      value={item.qty}
-                                      onChange={(e) => updateCartItem(idx, 'qty', parseInt(e.target.value) || 1)}
-                                      className="w-full bg-slate-50/50 border border-slate-100 rounded-xl px-3 py-2 text-xs font-black outline-none focus:bg-white focus:ring-4 focus:ring-primary/5 transition-all"
-                                    />
-                                  </div>
-                               </div>
-                               <div className="space-y-1.5">
-                                  <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest pl-1">Rate</label>
-                                  <div className="relative">
-                                    <input 
-                                      type="number" 
-                                      value={item.price}
-                                      onChange={(e) => updateCartItem(idx, 'price', parseInt(e.target.value) || 0)}
-                                      className="w-full bg-slate-50/50 border border-slate-100 rounded-xl px-3 py-2 text-xs font-black outline-none focus:bg-white focus:ring-4 focus:ring-primary/5 transition-all"
-                                    />
-                                  </div>
-                               </div>
-                               <div className="space-y-1.5">
-                                  <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest pl-1 text-right block pr-1">Total</label>
-                                  <div className="w-full h-[34px] flex items-center justify-end font-black text-slate-900 text-sm tracking-tight pr-1">
-                                     ₹{calculateItemTotal(item).toFixed(0)}
-                                  </div>
-                               </div>
-                            </div>
-                         </motion.div>
-                      ))
-                   )}
-                </AnimatePresence>
-             </div>
-
-             <div className="p-8 bg-white border-t border-slate-100 space-y-6 flex-shrink-0 shadow-[0_-25px_50px_rgba(0,0,0,0.05)] z-10">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-2">Client Selection</label>
-                    <div className="relative group">
-                       <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-hover:text-primary transition-colors">
-                          <User size={14} />
-                       </div>
-                       <select 
-                         value={selectedCustomer}
-                         onChange={(e) => setSelectedCustomer(e.target.value)}
-                         className="w-full pl-10 pr-4 py-3.5 bg-slate-50 border border-slate-100 rounded-[1.25rem] text-[10px] font-black outline-none appearance-none cursor-pointer hover:bg-slate-100 focus:bg-white focus:ring-8 focus:ring-primary/5 transition-all shadow-inner"
-                       >
-                         <option value="">Walk-in Customer</option>
-                         {state.customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                       </select>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-2">Broker Mapping</label>
-                    <div className="relative group">
-                       <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-hover:text-primary transition-colors">
-                          <Tag size={14} />
-                       </div>
-                       <select 
-                         value={selectedBroker}
-                         onChange={(e) => setSelectedBroker(e.target.value)}
-                         className="w-full pl-10 pr-4 py-3.5 bg-slate-50 border border-slate-100 rounded-[1.25rem] text-[10px] font-black outline-none appearance-none cursor-pointer hover:bg-slate-100 focus:bg-white focus:ring-8 focus:ring-primary/5 transition-all shadow-inner"
-                       >
-                         <option value="">No Direct Broker</option>
-                         {state.brokers.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-                       </select>
-                    </div>
-                  </div>
+                                  <option>Pcs</option>
+                                  <option>Mtr</option>
+                               </select>
+                            </td>
+                            <td className="border-r border-slate-200 bg-blue-50/30">
+                               <input 
+                                 type="text"
+                                 className="w-full bg-transparent text-center outline-none font-bold text-blue-900" 
+                                 value={item.pcs} 
+                                 onChange={e => updateSaleItem(idx, { pcs: e.target.value })}
+                               />
+                            </td>
+                            <td className="border-r border-slate-200">
+                               <input 
+                                 type="text"
+                                 className="w-full bg-transparent text-center outline-none" 
+                                 value={item.mtr} 
+                                 onChange={e => updateSaleItem(idx, { mtr: e.target.value })}
+                               />
+                            </td>
+                            <td className="border-r border-slate-200">
+                               <input 
+                                 type="text"
+                                 className="w-full bg-transparent text-center outline-none font-bold" 
+                                 value={item.rate} 
+                                 onChange={e => updateSaleItem(idx, { rate: e.target.value })}
+                               />
+                            </td>
+                            <td className="border-r border-slate-200 bg-emerald-50 text-emerald-700 font-black">{parseFloat(item.amount).toFixed(2)}</td>
+                            <td className="border-r border-slate-200">
+                               <input 
+                                 type="text"
+                                 className="w-full bg-transparent text-center outline-none" 
+                                 value={item.discPerc} 
+                                 onChange={e => updateSaleItem(idx, { discPerc: e.target.value })}
+                               />
+                            </td>
+                            <td className="text-slate-400">{parseFloat(item.discAmt).toFixed(2)}</td>
+                          </tr>
+                        ))}
+                        {/* Interactive Row */}
+                        <tr className="bg-amber-50 h-8">
+                           <td className="border-r border-slate-200 text-amber-600">+</td>
+                           <td colSpan={3} className="border-r border-slate-200 px-1">
+                              <select 
+                                className="w-full bg-transparent border-none text-[9px] font-black uppercase outline-none"
+                                onChange={(e) => {
+                                  const p = state.products.find(prod => prod.id === e.target.value);
+                                  if (p) setSelectionModal(p);
+                                }}
+                                value=""
+                              >
+                                <option value="">SELECT PRODUCT TO ADD ARTICLE...</option>
+                                {state.products.map(p => <option key={p.id} value={p.id}>{p.name} ({p.brand})</option>)}
+                              </select>
+                           </td>
+                           <td colSpan={8} className="text-slate-400 font-bold uppercase tracking-widest">Article Selection Mode Active</td>
+                        </tr>
+                        {/* Padding Rows */}
+                        {Array.from({ length: Math.max(0, 10 - saleItems.length) }).map((_, i) => (
+                           <tr key={`fill-${i}`} className="h-6 opacity-30">
+                              <td className="border-r border-slate-200"></td>
+                              <td className="border-r border-slate-200"></td>
+                              <td className="border-r border-slate-200"></td>
+                              <td className="border-r border-slate-200"></td>
+                              <td className="border-r border-slate-200"></td>
+                              <td className="border-r border-slate-200"></td>
+                              <td className="border-r border-slate-200"></td>
+                              <td className="border-r border-slate-200"></td>
+                              <td className="border-r border-slate-200"></td>
+                              <td className="border-r border-slate-200"></td>
+                              <td className="border-r border-slate-200"></td>
+                              <td></td>
+                           </tr>
+                        ))}
+                      </tbody>
+                   </table>
                 </div>
 
-                <div className="space-y-3 bg-slate-950 p-7 rounded-[2.5rem] shadow-2xl relative overflow-hidden group">
-                   {/* Background Glow */}
-                   <div className="absolute top-0 right-0 w-32 h-32 bg-primary/20 blur-3xl rounded-full -mr-16 -mt-16 group-hover:bg-primary/30 transition-all" />
-                   
-                   <div className="space-y-2.5 relative z-10">
-                      <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-slate-500">
-                         <span>Cart Valuation</span>
-                         <span className="text-slate-300">₹{totalBeforeTaxAndDiscount.toFixed(2)}</span>
-                      </div>
-                      <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-rose-500">
-                         <span>Global Rebate (-)</span>
-                         <span className="text-rose-400">₹{totalDiscount.toFixed(2)}</span>
-                      </div>
-                      <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-sky-500">
-                         <span>Consolidated GST (+)</span>
-                         <span className="text-sky-400">₹{totalGst.toFixed(2)}</span>
-                      </div>
-                      <div className="w-full h-px bg-white/5 my-2" />
-                      <div className="flex justify-between items-end pt-1">
-                         <div>
-                            <p className="text-[9px] font-black uppercase tracking-[0.2em] text-white/40 mb-1.5">Net Payable Amount</p>
-                            <h3 className="text-4xl font-black text-white tracking-tighter">₹{grandTotal.toFixed(0)}<span className="text-xs text-white/30 ml-1">.00</span></h3>
+                {/* Summary Section Footer */}
+                <div className="bg-slate-100 p-2 rounded-t border-t border-slate-300">
+                   <div className="grid grid-cols-1 md:grid-cols-4 gap-2 text-[9px] font-black">
+                      <div className="space-y-1">
+                         <div className="flex justify-between border-b border-white pb-0.5">
+                            <span className="text-slate-500 uppercase">PCS</span>
+                            <span className="text-blue-700">{totals.totalPcs}</span>
+                            <span className="text-slate-500 uppercase ml-2">VALUE</span>
+                            <span className="text-rose-600">{totals.grossValue.toFixed(2)}</span>
                          </div>
-                         <button 
-                           onClick={handleCreateInvoice}
-                           disabled={cart.length === 0}
-                           className={cn(
-                             "px-8 py-4 rounded-2xl font-black uppercase tracking-[0.15em] text-[10px] shadow-2xl transition-all flex items-center gap-3",
-                             cart.length > 0 
-                               ? "bg-primary text-white shadow-primary/40 hover:scale-[1.03] active:scale-95 group-hover:px-10" 
-                               : "bg-white/5 text-white/10 cursor-not-allowed border border-white/5"
-                           )}
-                         >
-                           <CreditCard size={14} className="group-hover:rotate-12 transition-transform" />
-                           Finalise & Sync
-                         </button>
+                         <div className="flex justify-between border-b border-white pb-0.5">
+                            <span className="text-slate-500 uppercase">MTR</span>
+                            <span className="text-blue-700">0.00</span>
+                            <span className="text-slate-500 uppercase ml-2">BRAND.DISC</span>
+                            <span className="text-rose-600">0.00</span>
+                         </div>
+                      </div>
+                      <div className="space-y-1">
+                         <div className="flex justify-between border-b border-white pb-0.5">
+                             <span className="text-slate-500 uppercase">ITEM.DISC</span>
+                             <span className="text-rose-600">{totals.itemDisc.toFixed(2)}</span>
+                         </div>
+                         <div className="flex justify-between border-b border-white pb-0.5">
+                             <span className="text-slate-500 uppercase">ITEM.ADD</span>
+                             <span className="text-emerald-600">0.00</span>
+                         </div>
+                      </div>
+                      <div className="space-y-1">
+                         <div className="flex justify-between border-b border-white pb-0.5">
+                             <span className="text-slate-500 uppercase">TAXABLE</span>
+                             <span className="text-rose-600">{totals.taxableAmt.toFixed(2)}</span>
+                             <span className="text-slate-500 uppercase ml-2">CGST</span>
+                             <span className="text-blue-700">{totals.cgst.toFixed(2)}</span>
+                         </div>
+                         <div className="flex justify-between border-b border-white pb-0.5">
+                             <span className="text-slate-500 uppercase">NET GST</span>
+                             <span className="text-rose-600">{totals.totalGst.toFixed(2)}</span>
+                             <span className="text-slate-500 uppercase ml-2">SGST</span>
+                             <span className="text-blue-700">{totals.sgst.toFixed(2)}</span>
+                         </div>
+                      </div>
+                      <div className="space-y-1">
+                         <div className="flex justify-between border-b border-white pb-0.5">
+                             <span className="text-slate-500 uppercase">IGST</span>
+                             <span className="text-blue-700">0.00</span>
+                         </div>
+                         <div className="flex justify-between border-b border-white pb-0.5 text-blue-900 border-b-2 border-blue-900">
+                             <span className="uppercase">R/OFF</span>
+                             <span>{totals.roundOff.toFixed(2)}</span>
+                             <span className="uppercase ml-2">BALES</span>
+                             <span>0</span>
+                         </div>
                       </div>
                    </div>
+
+                   <div className="mt-2 flex flex-col md:flex-row gap-2">
+                       <div className="flex-1 grid grid-cols-2 lg:grid-cols-4 gap-1 text-[8px] font-bold uppercase">
+                          <div className="flex items-center gap-2 bg-white px-2 py-1 border border-slate-200">
+                             <span className="text-blue-600">GST FORM</span>
+                             <span className="text-slate-900 font-black">{gstSaleForm.gstForm}</span>
+                          </div>
+                          <div className="flex items-center gap-2 bg-white px-2 py-1 border border-slate-200">
+                             <span className="text-blue-600">SALES MAN</span>
+                             <input className="flex-1 outline-none font-black" value={gstSaleForm.salesMan} onChange={e => setGstSaleForm({...gstSaleForm, salesMan: e.target.value})} />
+                          </div>
+                          <div className="flex items-center gap-2 bg-white px-2 py-1 border border-slate-200">
+                             <span className="text-blue-600">TRANSPORT</span>
+                             <input className="flex-1 outline-none font-black" value={gstSaleForm.transport} onChange={e => setGstSaleForm({...gstSaleForm, transport: e.target.value})} />
+                          </div>
+                          <div className="flex items-center gap-2 bg-white px-2 py-1 border border-slate-200">
+                             <span className="text-blue-600">BROKER</span>
+                             <input className="flex-1 outline-none font-black" value={gstSaleForm.broker} onChange={e => setGstSaleForm({...gstSaleForm, broker: e.target.value})} />
+                          </div>
+                       </div>
+                       
+                       {/* Final Amount Display Area */}
+                       <div className="flex-1 flex gap-1 items-end">
+                          <div className="flex-1 bg-slate-200 p-2 rounded flex items-center justify-between border border-slate-300">
+                             <span className="text-blue-900 font-black text-xs uppercase italic">BILL AMOUNT ==&gt;</span>
+                             <div className="bg-rose-900 text-white px-6 py-1 text-3xl font-black rounded shadow-inner leading-none">
+                                {totals.netAmount.toFixed(0)}
+                             </div>
+                          </div>
+                       </div>
+                   </div>
+
+                   <div className="mt-1 text-[7px] font-black text-slate-400 flex justify-between items-center bg-white px-2 py-1 rounded">
+                      <div className="flex gap-4">
+                         <span>Inserted By User : SA On {format(new Date(), 'dd/MMM/yyyy HH:mm:ss').toUpperCase()}</span>
+                         <span className="text-emerald-600">BILL NO: {gstSaleForm.billNo}</span>
+                      </div>
+                      <div className="flex gap-4">
+                         <span>ST.CODE: 09</span>
+                         <span>Server: ANKITSERVER</span>
+                         <span className="bg-blue-900 text-white px-2 rounded">{state.businessProfile.name}</span>
+                      </div>
+                   </div>
+                </div>
+             </div>
+
+             {/* Right Sidebar Actions */}
+             <div className="w-full md:w-32 flex flex-col gap-1 overflow-y-auto no-scrollbar pb-1">
+                <div className="flex flex-col gap-1">
+                   <button onClick={() => alert('IRN Generation Service Initializing...')} className="bg-rose-600 text-white py-2 text-[9px] font-black rounded shadow-md hover:bg-rose-700 uppercase tracking-tighter">E-Invoice</button>
+                   <button onClick={() => alert('Connecting to NIC E-Way Bill Portal...')} className="bg-sky-600 text-white py-2 text-[9px] font-black rounded shadow-md hover:bg-sky-700 uppercase tracking-tighter">E-Way Bill</button>
+                   <button onClick={() => alert('Opening Delivery Challan Wizard...')} className="bg-emerald-600 text-white py-2 text-[9px] font-black rounded shadow-md hover:bg-emerald-700 uppercase tracking-tighter">Fill Challan</button>
+                   <button onClick={() => alert('Loading Bill-by-Bill Payment Adjustment...')} className="bg-blue-600 text-white py-2 text-[9px] font-black rounded shadow-md hover:bg-blue-700 uppercase tracking-tighter">Payment Adjust</button>
+                   <button onClick={() => alert(`Loading history for ${gstSaleForm.customerName || 'walk-in'}`)} className="bg-slate-700 text-white py-2 text-[9px] font-black rounded shadow-md hover:bg-slate-800 uppercase tracking-tighter">Sale History (Party)</button>
+                   <button onClick={() => alert('Voucher cloning service active.')} className="bg-rose-100 text-rose-800 py-2 text-[9px] font-black rounded border border-rose-200 mt-2 uppercase tracking-tighter">Copy Bill</button>
+                </div>
+                
+                <div className="bg-white border border-slate-300 rounded p-1 mt-2 flex flex-col gap-1 flex-1">
+                   {[
+                     { label: 'New (F2)', icon: <Plus size={10} />, action: () => {
+                       setSaleItems([]);
+                       setGstSaleForm(prev => ({...prev, billNo: (state.invoices.length + 1).toString().padStart(2, '0')}));
+                     } },
+                     { label: 'Modify (F3)', icon: <Tag size={10} />, action: () => {} },
+                     { label: 'Delete (F4)', icon: <Trash2 size={10} />, action: () => {} },
+                     { label: 'Print (Ctrl+P)', icon: <Printer size={10} />, action: handleCreateInvoice },
+                     { label: 'Save (Ctrl+S)', icon: <CheckCircle2 size={10} />, action: handleCreateInvoice },
+                     { label: 'Close (F10)', icon: <X size={10} />, action: () => setView('dashboard') },
+                   ].map((btn, i) => (
+                      <button 
+                        key={i}
+                        onClick={btn.action}
+                        className="flex flex-col items-center justify-center py-2 bg-slate-50 border border-slate-200 hover:bg-slate-100 rounded text-slate-600 group transition-all"
+                      >
+                         <div className="text-primary group-hover:scale-110 transition-transform">{btn.icon}</div>
+                         <span className="text-[7px] font-black uppercase mt-1 px-1 text-center">{btn.label}</span>
+                      </button>
+                   ))}
                 </div>
              </div>
           </div>
@@ -712,13 +1117,21 @@ export default function Sales({ state, setState, currentView }: SalesProps) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-medium">
-                {state.invoices.length === 0 ? (
+                {filteredInvoices.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-8 py-20 text-center text-slate-300 font-black uppercase tracking-[0.2em] text-[10px]">No sales recorded in the system.</td>
+                    <td
+                      colSpan={6}
+                      className="px-8 py-20 text-center text-slate-300 font-black uppercase tracking-[0.2em] text-[10px]"
+                    >
+                      No sales recorded for the current filters.
+                    </td>
                   </tr>
                 ) : (
-                  state.invoices.map(inv => (
-                    <tr key={inv.id} className="hover:bg-slate-50 transition-colors">
+                  filteredInvoices.map((inv) => (
+                    <tr
+                      key={inv.id}
+                      className="hover:bg-slate-50 transition-colors"
+                    >
                       <td className="px-8 py-6 text-sm font-black text-slate-800">{inv.invoiceNo}</td>
                       <td className="px-8 py-6 text-xs text-slate-500 font-black uppercase">{format(new Date(inv.date), 'dd MMM yyyy, HH:mm')}</td>
                       <td className="px-8 py-6 text-sm text-slate-600 font-black">{
@@ -740,17 +1153,28 @@ export default function Sales({ state, setState, currentView }: SalesProps) {
                            <Printer size={18} />
                         </button>
                         <button 
+                          onClick={() => {
+                            setSearchTerm(inv.invoiceNo);
+                            setView('transport');
+                          }}
+                          className="w-10 h-10 flex items-center justify-center text-slate-400 hover:text-blue-500 transition-all rounded-full hover:bg-blue-50"
+                          title="Track Transport"
+                        >
+                           <TruckIcon size={18} />
+                        </button>
+                        <button 
+                          onClick={() => handleModifyInvoice(inv)}
+                          className="w-10 h-10 flex items-center justify-center text-slate-400 hover:text-orange-500 transition-all rounded-full hover:bg-orange-50"
+                          title="Modify Invoice"
+                        >
+                           <Tag size={18} />
+                        </button>
+                        <button 
                           onClick={() => handleOpenPreview(inv)}
                           className="w-10 h-10 flex items-center justify-center text-slate-400 hover:text-primary transition-all rounded-full hover:bg-primary/5"
                           title="Preview Bill"
                         >
                            <Calculator size={20} />
-                        </button>
-                        <button 
-                          onClick={() => handleOpenPreview(inv)}
-                          className="w-10 h-10 flex items-center justify-center text-slate-400 hover:text-primary transition-all rounded-full hover:bg-primary/5"
-                        >
-                           <ChevronRight size={20} />
                         </button>
                       </td>
                     </tr>
@@ -790,10 +1214,9 @@ export default function Sales({ state, setState, currentView }: SalesProps) {
                       )}
                     >
                        <div className="flex items-center gap-4">
-                          <div className="w-4 h-4 rounded-full border border-white shadow-xl" style={{ backgroundColor: v.colorCode }} />
                           <div>
                              <p className="font-black text-slate-800 uppercase text-xs">Size {v.size} - {v.color}</p>
-                             <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Available Stock: {v.qty}</p>
+                             <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Available Stock: {v.qty} {v.hsnCode && `| HSN ${v.hsnCode}`}</p>
                           </div>
                        </div>
                        <div className="text-right">
@@ -1026,20 +1449,24 @@ export default function Sales({ state, setState, currentView }: SalesProps) {
                       {/* Indian Style Invoice Header */}
                     <div className="text-center mb-0 relative pb-2">
                          <div className="absolute left-0 top-0 text-left">
-                            <div className="font-serif italic font-black text-lg leading-none">Ankit <span className="block text-[8px] tracking-widest not-italic">Enterprises</span></div>
+                            {state.businessProfile.logoUrl ? (
+                               <img src={state.businessProfile.logoUrl} alt="Logo" className="w-10 h-10 object-contain" />
+                             ) : (
+                               <div className="font-serif italic font-black text-lg leading-none">{state.businessProfile.name.split(' ')[0]} <span className="block text-[8px] tracking-widest not-italic">{state.businessProfile.name.split(' ').slice(1).join(' ')}</span></div>
+                             )}
                             <div className="border border-black px-1 mt-1 font-black text-[9px] inline-block">TAX-INVOICE</div>
                          </div>
 
                          <div className="text-[10px] font-black text-rose-600 mb-1 flex items-center justify-center gap-4">
                             <span>|| श्री गणेशाय नमः ||</span>
                          </div>
-                         <h1 className="text-4xl font-black uppercase tracking-tight mb-0">ANKIT ENTERPRISES</h1>
-                         <p className="font-bold text-[9px]">123, Textile Market, Ring Road, Surat - 395002 (Gujarat)</p>
+                         <h1 className="text-4xl font-black uppercase tracking-tight mb-0">{state.businessProfile.name}</h1>
+                         <p className="font-bold text-[9px]">{state.businessProfile.address}, {state.businessProfile.city} - {state.businessProfile.pincode} ({state.businessProfile.state.split('-')[1]})</p>
                          
                          <div className="grid grid-cols-3 border-y border-black mt-2 text-[8px] font-bold py-0.5">
-                            <div className="text-left px-1 border-r border-black">GST NO. <span className="font-black text-[9px]">24ANKIT1234E1Z5</span></div>
-                            <div className="text-center px-1 border-r border-black uppercase">Contact No : +91 99887 76655</div>
-                            <div className="text-right px-1">PAN NO. <span className="font-black">ANKIT1234E</span></div>
+                            <div className="text-left px-1 border-r border-black">GST NO. <span className="font-black text-[9px]">{state.businessProfile.gstin}</span></div>
+                            <div className="text-center px-1 border-r border-black uppercase text-[7px] overflow-hidden whitespace-nowrap">Contact : {state.businessProfile.phone} | {state.businessProfile.email}</div>
+                            <div className="text-right px-1 overflow-hidden whitespace-nowrap text-[7px]">PAN: {state.businessProfile.gstin.slice(2, 12)}</div>
                          </div>
                          <div className="grid grid-cols-4 border-b border-black text-[8px] font-bold py-0.5">
                             <div className="text-left px-1 border-r border-black">BILL NO : <span className="text-[9px] font-black">{previewInvoice.invoiceNo.split('/').pop()}</span></div>
@@ -1053,15 +1480,15 @@ export default function Sales({ state, setState, currentView }: SalesProps) {
                          <div className="border-r border-black p-1 space-y-0.5">
                             <div className="flex gap-2">
                                <span className="font-black w-20">PARTY NAME :</span>
-                               <span className="font-black text-blue-800 uppercase">{state.customers.find(c => c.id === previewInvoice.customerId)?.name || 'AMAN COLLECTION'}</span>
+                               <span className="font-black text-blue-800 uppercase">{previewInvoice.customerName || (state.customers.find(c => c.id === previewInvoice.customerId)?.name) || 'Walk-in Customer'}</span>
                             </div>
                             <div className="flex gap-2 items-start">
                                <span className="font-black w-20">ADDRESS :</span>
-                               <span className="flex-1 uppercase">152/122A, BHUSOLI TOLA KHUSHROBAGH, KHULDABAD, PRAYAGRAJ</span>
+                               <span className="flex-1 uppercase">{previewInvoice.customerAddress || '-'}</span>
                             </div>
                             <div className="flex gap-2">
                                <span className="font-black w-20">CITY :</span>
-                               <span className="uppercase text-blue-800 font-bold">PRAYAGRAJ</span>
+                               <span className="uppercase text-blue-800 font-bold">{previewInvoice.customerCity || 'PRAYAGRAJ'}</span>
                             </div>
                             <div className="flex gap-2">
                                <span className="font-black w-20">STATE CODE :</span>
@@ -1071,7 +1498,7 @@ export default function Sales({ state, setState, currentView }: SalesProps) {
                          <div className="p-1 space-y-0.5">
                             <div className="flex gap-2">
                                <span className="font-black w-20">GSTIN NO. :</span>
-                               <span className="font-black text-blue-800 uppercase">09AVOPR1645M1ZT</span>
+                               <span className="font-black text-blue-800 uppercase">{previewInvoice.customerGstNo || '-'}</span>
                             </div>
                             <div className="flex gap-2">
                                <span className="font-black w-20">AADHAR NO. :</span>
@@ -1086,11 +1513,11 @@ export default function Sales({ state, setState, currentView }: SalesProps) {
                             <div className="flex justify-between">
                                <div className="flex gap-2">
                                   <span className="font-black w-20">MOBILE NO. :</span>
-                                  <span className="font-black">8009148468</span>
+                                  <span className="font-black">{previewInvoice.customerMobile || '-'}</span>
                                </div>
                                <div className="flex gap-2 text-right">
                                   <span className="font-black">PAN NO. :</span>
-                                  <span className="font-black">AVOPR1645M</span>
+                                  <span className="font-black">{previewInvoice.customerPan || '-'}</span>
                                </div>
                             </div>
                          </div>
@@ -1127,7 +1554,7 @@ export default function Sales({ state, setState, currentView }: SalesProps) {
                                      <td className="border-r border-black py-1 px-1 uppercase">{p?.name || 'COTTON PRINT'}</td>
                                      <td className="border-r border-black py-1 px-1 text-center uppercase tracking-tighter">{p?.brand || 'NIHARIKA'}</td>
                                      <td className="border-r border-black py-1 px-1 text-center uppercase tracking-tighter">{p?.category || 'COTTON SUIT'}</td>
-                                     <td className="border-r border-black py-1 px-1 text-center font-black">610419</td>
+                                     <td className="border-r border-black py-1 px-1 text-center font-black">{item.hsnCode || p?.hsnCode || '-'}</td>
                                      <td className="border-r border-black py-1 px-1 text-center">Pcs</td>
                                      <td className="border-r border-black py-1 px-1 text-center font-black">{item.qty}</td>
                                      <td className="border-r border-black py-1 px-1 text-center">-</td>
@@ -1200,11 +1627,11 @@ export default function Sales({ state, setState, currentView }: SalesProps) {
                          <div className="col-span-2 divide-y divide-black font-black">
                             <div className="flex justify-between px-2 py-1 text-slate-500">
                                <span>Taxable Value</span>
-                               <span>{(getSubtotal(previewInvoice) - getTax(previewInvoice)).toFixed(2)}</span>
+                               <span>{previewInvoice.summary ? previewInvoice.summary.taxableAmt.toFixed(2) : (getSubtotal(previewInvoice) - getTax(previewInvoice)).toFixed(2)}</span>
                             </div>
                             <div className="flex justify-between px-2 py-1 text-slate-500">
                                <span>Total GST</span>
-                               <span>{getTax(previewInvoice).toFixed(1)}</span>
+                               <span>{previewInvoice.summary ? previewInvoice.summary.totalGst.toFixed(2) : getTax(previewInvoice).toFixed(1)}</span>
                             </div>
                             <div className="flex justify-between px-2 py-1 text-slate-500">
                                <span>Addition AMT.</span>
@@ -1216,7 +1643,7 @@ export default function Sales({ state, setState, currentView }: SalesProps) {
                             </div>
                             <div className="bg-blue-900 text-white flex justify-between px-2 py-2 text-[11px]">
                                <span>BILL AMOUNT</span>
-                               <span>{previewInvoice.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                               <span>{previewInvoice.summary ? previewInvoice.summary.netAmount.toLocaleString(undefined, { minimumFractionDigits: 2 }) : previewInvoice.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                             </div>
                          </div>
                       </div>
@@ -1244,7 +1671,7 @@ export default function Sales({ state, setState, currentView }: SalesProps) {
                          <div className="p-1 text-right flex flex-col justify-between">
                             <div className="flex justify-between">
                                <span className="font-black text-rose-600">FOR</span>
-                               <span className="font-black text-blue-900 uppercase">ANKIT ENTERPRISES</span>
+                               <span className="font-black text-blue-900 uppercase">{state.businessProfile.name}</span>
                             </div>
                             <div className="text-blue-800 italic font-bold">Nityanand Kumar Rai</div>
                             <div className="font-black text-[7px] uppercase">Authorised Signatory</div>

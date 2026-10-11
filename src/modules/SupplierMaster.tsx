@@ -1,15 +1,16 @@
 import React, { useState, Dispatch, SetStateAction } from 'react';
 import { ShoppingCart, Plus, MapPin, Search, X, Phone, ShieldCheck, Mail, Building2 } from 'lucide-react';
-import { AppState, Supplier } from '../types';
+import { AppState, Supplier, View } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 
 interface SupplierMasterProps {
   state: AppState;
   setState: Dispatch<SetStateAction<AppState>>;
+  setView?: (view: View) => void;
 }
 
-export default function SupplierMaster({ state, setState }: SupplierMasterProps) {
+export default function SupplierMaster({ state, setState, setView }: SupplierMasterProps) {
   const [isSupplierModal, setIsSupplierModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -119,6 +120,27 @@ export default function SupplierMaster({ state, setState }: SupplierMasterProps)
                       </div>
                       <span className="text-[11px] font-bold text-slate-600 truncate">{s.city ? `${s.city}, ` : ''}{s.address || 'Address Not Provided'}</span>
                    </div>
+                </div>
+              </div>
+
+              <div className="mt-8 flex flex-col gap-2 relative z-10">
+                <div className="flex gap-2">
+                   <button 
+                     onClick={() => {
+                       setView('purchase');
+                     }}
+                     className="flex-1 py-3 bg-blue-600 text-white rounded-2xl text-[9px] font-black uppercase tracking-widest shadow-xl shadow-blue-600/20 hover:scale-105 active:scale-95 transition-all"
+                   >
+                     Procurement
+                   </button>
+                   <button 
+                     onClick={() => {
+                       setView('accounting');
+                     }}
+                     className="flex-1 py-3 bg-slate-50 text-slate-500 rounded-2xl text-[9px] font-black uppercase tracking-widest border border-slate-100 hover:bg-slate-800 hover:text-white transition-all shadow-sm active:scale-95"
+                   >
+                     Account Ledger
+                   </button>
                 </div>
               </div>
 

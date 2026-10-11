@@ -1,5 +1,5 @@
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Cell } from 'recharts';
-import { TrendingUp, ShoppingBag, Users, Wallet, ArrowUpRight, ArrowDownRight, Package as PackageIcon, Truck } from 'lucide-react';
+import { TrendingUp, ShoppingBag, Users, Wallet, ArrowUpRight, ArrowDownRight, Package as PackageIcon, Truck, FileSpreadsheet, BookOpen } from 'lucide-react';
 import { AppState } from '../types';
 import { motion } from 'motion/react';
 
@@ -57,12 +57,16 @@ export default function Dashboard({ state, setView }: DashboardProps) {
     { label: 'Add Purchase', icon: TrendingUp, view: 'purchase', color: 'bg-blue-500' },
     { label: 'New Product', icon: PackageIcon, view: 'inventory', color: 'bg-orange-500' },
     { label: 'Transport Slip', icon: Truck, view: 'transport', color: 'bg-purple-500' },
+    { label: 'Purchase Rep.', icon: ShoppingBag, view: 'purchaseReports', color: 'bg-indigo-500' },
+    { label: 'Bill Adjustment', icon: Wallet, view: 'adjustment', color: 'bg-pink-500' },
+    { label: 'Taxation & GST', icon: FileSpreadsheet, view: 'taxation', color: 'bg-emerald-600' },
+    { label: 'A/C Reports', icon: BookOpen, view: 'accountReports', color: 'bg-blue-600' },
   ];
 
   return (
     <div className="space-y-10">
       {/* Quick Actions */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
+      <div className="grid grid-cols-2 lg:grid-cols-7 gap-4 md:gap-6">
         {quickActions.map((action, i) => (
           <motion.button
             key={i}
